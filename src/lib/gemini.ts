@@ -22,8 +22,14 @@ export function limitePadraoPrevias(): number {
   return Number.isFinite(bruto) && bruto > 0 ? bruto : 5;
 }
 
+/**
+ * Alias `-latest` de proposito: os nomes de modelo do Gemini mudam e sao
+ * aposentados rapido (o gemini-2.5-flash, por exemplo, ja responde 404 pra
+ * chaves novas). O alias sempre aponta pro Flash vigente do tier gratuito.
+ * Da pra fixar uma versao especifica por GEMINI_MODEL quando quiser.
+ */
 function modeloAtual(): string {
-  return process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash";
+  return process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
 }
 
 function chaveApi(): string {
@@ -89,7 +95,10 @@ Responda APENAS com o prompt final, pronto para copiar e colar. Não adicione ex
  * Nunca falha silenciosamente: erro de rede/API vira ErroGemini com mensagem
  * clara pro usuario.
  */
-export async function montarPromptPrevia(dados: DadosEmpresaPrevia): Promise<string> {
+export async function montarPromptPrevia(
+  dados: DadosEmpresaPrevia,
+  tentativa = 0,
+): Promise<string> {
   const chave = chaveApi();
   const modelo = modeloAtual();
   const instrucao = montarInstrucao(dados);
@@ -102,27 +111,55 @@ export async function montarPromptPrevia(dados: DadosEmpresaPrevia): Promise<str
     },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: instrucao }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 700 },
+      // ATENCAO: nos modelos Flash atuais os tokens de "thinking" saem do MESMO
+      // orcamento do maxOutputTokens (um briefing curto chega a gastar ~800 so
+      // pensando). Com teto baixo a resposta visivel volta truncada, entao aqui
+      // o teto e folgado de proposito. Nao adianta mandar thinkingConfig:
+      // thinkingBudget 0 e recusado com 400 e valores baixos sao ignorados.
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
     }),
     cache: "no-store",
   });
 
   if (!resposta.ok) {
     const texto = await resposta.text().catch(() => "");
+
+    // 503 = "high demand" (transitorio) e 429 = cota: vale uma segunda chance
+    // antes de gastar o clique do usuario.
+    if ((resposta.status === 503 || resposta.status === 429) && tentativa === 0) {
+      await new Promise((r) => setTimeout(r, 1500));
+      return montarPromptPrevia(dados, tentativa + 1);
+    }
+
     throw new ErroGemini(
-      `Gemini respondeu ${resposta.status}: ${texto.slice(0, 300)}`,
+      resposta.status === 503
+        ? "O Gemini está com alta demanda agora. Tente de novo em alguns segundos."
+        : `Gemini respondeu ${resposta.status}: ${texto.slice(0, 300)}`,
       resposta.status === 429 ? 429 : 502,
     );
   }
 
   const json = (await resposta.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      finishReason?: string;
+      content?: { parts?: { text?: string; thought?: boolean }[] };
+    }[];
   };
 
-  const textoGerado = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("");
+  const candidato = json.candidates?.[0];
+
+  // Partes marcadas como `thought` sao raciocinio interno, nunca a resposta.
+  const textoGerado = candidato?.content?.parts
+    ?.filter((p) => !p.thought)
+    .map((p) => p.text ?? "")
+    .join("");
 
   if (!textoGerado?.trim()) {
-    throw new ErroGemini("O Gemini não retornou nenhum texto. Tente novamente.");
+    throw new ErroGemini(
+      candidato?.finishReason === "MAX_TOKENS"
+        ? "O modelo gastou todo o orçamento pensando e não sobrou resposta. Tente novamente."
+        : "O Gemini não retornou nenhum texto. Tente novamente.",
+    );
   }
 
   return textoGerado.trim();

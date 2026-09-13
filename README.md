@@ -42,13 +42,22 @@ npm run dev                  # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave pública do Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Worker de follow-up (somente servidor) |
 | `GOOGLE_PLACES_API_KEY` | Places API (New) |
+| `GEMINI_API_KEY` | Gerador de prévia de site ([aistudio.google.com/apikey](https://aistudio.google.com/apikey)) |
+| `GEMINI_MODEL` | Modelo do Gemini (padrão `gemini-flash-latest`) |
+| `PREVIAS_LIMITE_DIARIO` | Prévias por dia por usuário (padrão 5) |
 | `NEXT_PUBLIC_SITE_URL` | Base para OAuth, sitemap e metadata |
 | `CRON_SECRET` | Protege `/api/cron/follow-ups` |
 | `RATE_LIMIT_BUSCAS_POR_MINUTO` | Proteção técnica de infraestrutura (padrão 10) |
 | `RATE_LIMIT_JANELA_SEGUNDOS` | Janela do rate limit (padrão 60) |
 
-O rate limit **não é um plano**: ele só evita rajadas que estourariam a cota da API do Google
-e nunca aparece na interface como limitação de produto.
+O rate limit e a cota diária de prévias **não são planos**: só evitam rajadas que estourariam
+as cotas gratuitas do Google e do Gemini, e nunca aparecem na interface como limitação de
+produto — todo recurso continua liberado para qualquer conta.
+
+> **Sobre o `GEMINI_MODEL`:** o padrão é o alias `gemini-flash-latest` de propósito. Os nomes
+> de modelo do Gemini mudam e são aposentados rápido — `gemini-2.5-flash`, por exemplo, já
+> responde 404 para chaves novas. Fixe uma versão específica só se precisar de comportamento
+> previsível.
 
 ---
 
@@ -124,6 +133,8 @@ src/app/                 Rotas (App Router)
     resultados/[buscaId] Empresas encontradas + selo do Radar
     radar/               Só as oportunidades quentes e intocadas
     leads/               Funil kanban (Novo → Contatado → Respondeu → Fechado)
+    enviar-mensagem/     Fila de WhatsApp verificado (envio manual via wa.me)
+    previas/             Histórico dos prompts de prévia de site gerados por IA
     templates/           CRUD com variáveis e prévia
     cadencias/           Sequências de follow-up (dia 0 / 3 / 7)
     projetos/            Agrupamento por cliente ou campanha
@@ -132,7 +143,8 @@ src/app/                 Rotas (App Router)
   api/buscas             Executa a varredura completa
   api/cron/follow-ups    Worker de follow-up
 src/components/          UI de marketing, auth e app
-src/lib/                 Places, Instagram, Radar, templates, cadências, rate limit
+src/lib/                 Places, Instagram, Radar, templates, cadências, rate limit,
+                         whatsapp (formato E.164), gemini (prévia), fuso-brasil (cota)
 supabase/                schema.sql, cron.sql e a Edge Function
 ```
 
@@ -155,6 +167,42 @@ e são os únicos que aparecem em `/app/radar`.
 
 `{{empresa}}` `{{cidade}}` `{{nicho}}` `{{telefone}}` `{{site}}` `{{instagram}}`
 `{{nota}}` `{{avaliacoes}}` `{{meu_nome}}`
+
+## Fila de WhatsApp (`/app/enviar-mensagem`)
+
+Percorre um a um os leads com WhatsApp em formato válido, abrindo a conversa já com a
+mensagem do template preenchida.
+
+- **"Verificado" = formato, não confirmação.** `src/lib/whatsapp.ts` só checa se o telefone
+  tem cara de celular brasileiro (DDD + `9` + 8 dígitos, com ou sem o DDI 55) e normaliza
+  para E.164. Não há API paga de verificação — quem confirma de fato é o próprio WhatsApp
+  quando você abre a conversa.
+- **Nada é enviado automaticamente.** O sistema só monta o link `wa.me` e abre em outra aba;
+  você manda a mensagem com a mão. Isso é deliberado: disparo automatizado é o que leva a
+  bloqueio de número.
+- **Avanço sem clique extra.** Ao voltar para a aba do RastroLead (eventos `focus` /
+  `visibilitychange`), o lead é marcado como contatado e a fila pula para o próximo — com um
+  "Desfazer" logo em seguida caso você tenha só trocado de aba sem enviar.
+
+## Gerador de prévia de site (`/app/previas`)
+
+Para leads **sem site** (o critério de prioridade alta do Radar), gera um *prompt* pronto
+para colar em outra IA geradora de sites — não gera o site em si.
+
+- Reúne os dados já coletados da empresa (nome, nicho, endereço, telefone, nota, Instagram,
+  quantidade de fotos no Google) e pede ao Gemini um briefing com serviços prováveis, tom
+  visual, paleta sugerida e seções recomendadas.
+- O prompt gerado instrui explicitamente a IA seguinte a **não inventar** depoimentos,
+  prêmios ou número de clientes.
+- Cota de 5 por dia por usuário, derivada da contagem de linhas criadas hoje no fuso
+  `America/Sao_Paulo` — sem tabela de contador para resetar. Falha na chamada não consome
+  cota (a linha só é gravada depois do sucesso).
+- O histórico por empresa fica salvo, então reconsultar um prompt antigo não gasta cota.
+
+> **Nota de implementação:** nos modelos Flash atuais os tokens de *thinking* saem do mesmo
+> orçamento de `maxOutputTokens` — um briefing curto chega a gastar ~800 tokens só pensando.
+> Por isso o teto é folgado (4096); com teto baixo a resposta volta truncada. Enviar
+> `thinkingConfig.thinkingBudget: 0` é recusado com 400 nesses modelos.
 
 ---
 

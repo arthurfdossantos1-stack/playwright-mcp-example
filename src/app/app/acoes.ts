@@ -825,7 +825,7 @@ export async function gerarPreviaSite(empresaId: string): Promise<RespostaPrevia
     const { error: erroInsercao } = await supabase.from("previas_site").insert({
       user_id: user.id,
       empresa_id: empresaId,
-      modelo: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+      modelo: process.env.GEMINI_MODEL || "gemini-flash-latest",
       prompt_gerado: prompt,
     });
     if (erroInsercao) throw erroInsercao;
