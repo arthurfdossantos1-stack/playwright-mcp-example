@@ -66,6 +66,10 @@ begin
 end;
 $$;
 
+-- So o pg_cron (rodando como o dono/postgres) deve disparar isso. Exposta via
+-- REST, qualquer usuario anonimo poderia acionar o worker de todo mundo.
+revoke execute on function public.disparar_follow_ups_vencidos() from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Opcao A: pg_cron chama a funcao diretamente
 -- ---------------------------------------------------------------------------

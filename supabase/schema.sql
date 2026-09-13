@@ -296,6 +296,7 @@ create trigger on_auth_user_created
 create or replace function public.tocar_atualizado_em()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.atualizado_em = now();
@@ -331,9 +332,12 @@ alter table public.follow_ups        enable row level security;
 alter table public.interacoes        enable row level security;
 alter table public.rate_limit_eventos enable row level security;
 
+-- Nota: as politicas usam (select auth.uid()) em vez de auth.uid() puro.
+-- E a forma recomendada pelo Supabase para RLS: o valor e resolvido uma vez
+-- por consulta, nao reavaliado a cada linha (ver advisor auth_rls_initplan).
 drop policy if exists "profiles_self" on public.profiles;
 create policy "profiles_self" on public.profiles
-  for all using (auth.uid() = id) with check (auth.uid() = id);
+  for all using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 do $$
 declare
@@ -345,7 +349,7 @@ begin
   ] loop
     execute format('drop policy if exists %I on public.%I', t || '_owner', t);
     execute format(
-      'create policy %I on public.%I for all using (auth.uid() = user_id) with check (auth.uid() = user_id)',
+      'create policy %I on public.%I for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id)',
       t || '_owner', t
     );
   end loop;
@@ -355,6 +359,27 @@ end $$;
 drop policy if exists "rate_limit_sem_acesso" on public.rate_limit_eventos;
 create policy "rate_limit_sem_acesso" on public.rate_limit_eventos
   for select using (false);
+
+-- ---------------------------------------------------------------------------
+-- Funcoes internas nao devem ser chamaveis livremente via REST.
+-- handle_new_user roda apenas pelo trigger (nao precisa de EXECUTE explicito
+-- para isso); checar_rate_limit so faz sentido para quem ja esta logado.
+-- ---------------------------------------------------------------------------
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.checar_rate_limit(text, integer, integer) from public, anon;
+grant execute on function public.checar_rate_limit(text, integer, integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Indices cobrindo foreign keys (evita sequential scan em joins comuns)
+-- ---------------------------------------------------------------------------
+create index if not exists cadencia_etapas_template_id_idx on public.cadencia_etapas (template_id);
+create index if not exists cadencia_etapas_user_id_idx on public.cadencia_etapas (user_id);
+create index if not exists follow_ups_etapa_id_idx on public.follow_ups (etapa_id);
+create index if not exists follow_ups_lead_cadencia_id_idx on public.follow_ups (lead_cadencia_id);
+create index if not exists follow_ups_lead_id_idx on public.follow_ups (lead_id);
+create index if not exists interacoes_user_id_idx on public.interacoes (user_id);
+create index if not exists lead_cadencias_cadencia_id_idx on public.lead_cadencias (cadencia_id);
+create index if not exists leads_empresa_id_idx on public.leads (empresa_id);
 
 -- ---------------------------------------------------------------------------
 -- View de apoio: leads "intocados" (ainda nao movidos do funil)
