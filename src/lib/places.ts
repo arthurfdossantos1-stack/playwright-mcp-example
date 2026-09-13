@@ -40,6 +40,7 @@ const DETAILS_FIELD_MASK = [
   "googleMapsUri",
   "primaryTypeDisplayName",
   "businessStatus",
+  "photos",
 ].join(",");
 
 /** Teto de seguranca de paginas (a API do Google hoje devolve no maximo 3). */
@@ -60,6 +61,8 @@ export type PlaceResumo = {
 export type PlaceDetalhado = PlaceResumo & {
   telefone: string | null;
   website: string | null;
+  /** Nao baixamos as fotos - so a contagem, usada como contexto no prompt de previa. */
+  totalFotos: number;
 };
 
 type ApiPlace = {
@@ -75,6 +78,7 @@ type ApiPlace = {
   googleMapsUri?: string;
   primaryTypeDisplayName?: { text?: string };
   businessStatus?: string;
+  photos?: unknown[];
 };
 
 export class ErroPlaces extends Error {
@@ -209,6 +213,7 @@ export async function detalharEmpresa(
     ...resumo,
     telefone: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
     website: place.websiteUri ?? null,
+    totalFotos: Array.isArray(place.photos) ? place.photos.length : 0,
   };
 }
 
@@ -230,9 +235,9 @@ export async function detalharEmpresas(
       const resumo = resumos[indice];
       try {
         const detalhe = await detalharEmpresa(resumo.placeId, { sinal: opcoes.sinal });
-        saida[indice] = detalhe ?? { ...resumo, telefone: null, website: null };
+        saida[indice] = detalhe ?? { ...resumo, telefone: null, website: null, totalFotos: 0 };
       } catch {
-        saida[indice] = { ...resumo, telefone: null, website: null };
+        saida[indice] = { ...resumo, telefone: null, website: null, totalFotos: 0 };
       }
     }
   }

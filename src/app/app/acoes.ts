@@ -717,3 +717,158 @@ export async function criarConteudoInicial(): Promise<Resposta> {
     return falha(e);
   }
 }
+
+// ------------------------------------------------------ FILA DE WHATSAPP
+
+/**
+ * Marca a empresa como contatada pela fila de envio manual (/app/enviar-mensagem).
+ * Independente do funil de leads: a fila roda direto sobre `empresas`.
+ */
+export async function marcarContatadoFila(empresaId: string): Promise<Resposta> {
+  try {
+    const { supabase, user } = await exigirUsuario();
+    const { error } = await supabase
+      .from("empresas")
+      .update({ contatado_fila_em: new Date().toISOString() })
+      .eq("id", empresaId)
+      .eq("user_id", user.id);
+    if (error) throw error;
+
+    revalidatePath("/app/enviar-mensagem");
+    return { ok: true };
+  } catch (e) {
+    return falha(e);
+  }
+}
+
+/** Desfaz a marcação (o botão "Desfazer" logo após enviar). */
+export async function desfazerContatadoFila(empresaId: string): Promise<Resposta> {
+  try {
+    const { supabase, user } = await exigirUsuario();
+    const { error } = await supabase
+      .from("empresas")
+      .update({ contatado_fila_em: null })
+      .eq("id", empresaId)
+      .eq("user_id", user.id);
+    if (error) throw error;
+
+    revalidatePath("/app/enviar-mensagem");
+    return { ok: true };
+  } catch (e) {
+    return falha(e);
+  }
+}
+
+// --------------------------------------------------- PREVIA DE SITE (IA)
+
+export type RespostaPrevia = Resposta & { prompt?: string; restantes?: number; limite?: number };
+
+/**
+ * Gera o prompt de previa de site via Gemini. Cota diaria TECNICA (nao e
+ * plano): derivada por contagem de linhas criadas hoje no fuso do Brasil,
+ * sem contador mutavel pra resetar.
+ */
+export async function gerarPreviaSite(empresaId: string): Promise<RespostaPrevia> {
+  try {
+    const { supabase, user } = await exigirUsuario();
+    const { limitePadraoPrevias, montarPromptPrevia } = await import("@/lib/gemini");
+    const { inicioDoDiaBrasil } = await import("@/lib/fuso-brasil");
+
+    const limite = limitePadraoPrevias();
+
+    const { count: usadasHoje } = await supabase
+      .from("previas_site")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("criado_em", inicioDoDiaBrasil().toISOString());
+
+    if ((usadasHoje ?? 0) >= limite) {
+      return {
+        ok: false,
+        erro: `Você já usou as ${limite} prévias de hoje. O limite volta à meia-noite (horário de Brasília).`,
+        restantes: 0,
+        limite,
+      };
+    }
+
+    const { data: empresa, error: erroEmpresa } = await supabase
+      .from("empresas")
+      .select(
+        "id, nome, categoria, endereco, telefone, nota, total_avaliacoes, instagram, website, fotos_total, busca_id",
+      )
+      .eq("id", empresaId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (erroEmpresa) throw erroEmpresa;
+    if (!empresa) return { ok: false, erro: "Empresa não encontrada." };
+
+    const { data: busca } = await supabase
+      .from("buscas")
+      .select("nicho, cidade")
+      .eq("id", empresa.busca_id)
+      .maybeSingle();
+
+    const prompt = await montarPromptPrevia({
+      nome: empresa.nome,
+      nicho: busca?.nicho ?? empresa.categoria ?? "negócio local",
+      categoria: empresa.categoria,
+      cidade: busca?.cidade ?? null,
+      endereco: empresa.endereco,
+      telefone: empresa.telefone,
+      nota: empresa.nota,
+      totalAvaliacoes: empresa.total_avaliacoes,
+      instagram: empresa.instagram,
+      temSite: Boolean(empresa.website),
+      totalFotos: empresa.fotos_total,
+    });
+
+    const { error: erroInsercao } = await supabase.from("previas_site").insert({
+      user_id: user.id,
+      empresa_id: empresaId,
+      modelo: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+      prompt_gerado: prompt,
+    });
+    if (erroInsercao) throw erroInsercao;
+
+    revalidatePath("/app/previas");
+    revalidatePath(`/app/resultados/${empresa.busca_id}`);
+
+    return { ok: true, prompt, restantes: limite - (usadasHoje ?? 0) - 1, limite };
+  } catch (e) {
+    return falha(e) as RespostaPrevia;
+  }
+}
+
+export type ContextoPrevia = {
+  usadasHoje: number;
+  limite: number;
+  historico: { id: string; prompt_gerado: string; criado_em: string }[];
+};
+
+/** Cota usada hoje + historico de previas dessa empresa (abre o painel sem gastar cota). */
+export async function obterContextoPrevia(empresaId: string): Promise<ContextoPrevia> {
+  const { supabase, user } = await exigirUsuario();
+  const { limitePadraoPrevias } = await import("@/lib/gemini");
+  const { inicioDoDiaBrasil } = await import("@/lib/fuso-brasil");
+
+  const [{ count }, { data: historico }] = await Promise.all([
+    supabase
+      .from("previas_site")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("criado_em", inicioDoDiaBrasil().toISOString()),
+    supabase
+      .from("previas_site")
+      .select("id, prompt_gerado, criado_em")
+      .eq("empresa_id", empresaId)
+      .eq("user_id", user.id)
+      .order("criado_em", { ascending: false })
+      .limit(10),
+  ]);
+
+  return {
+    usadasHoje: count ?? 0,
+    limite: limitePadraoPrevias(),
+    historico: historico ?? [],
+  };
+}

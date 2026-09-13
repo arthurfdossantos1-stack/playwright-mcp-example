@@ -41,15 +41,31 @@
 
 @layer components {
   .texto-gradiente {
+    /* Azul -> ciano -> verde: evita o clichê roxo/azul de template genérico
+       e reforça a ponte visual entre "achar" (azul) e "converter" (verde). */
     background-image: linear-gradient(
-      100deg,
-      var(--color-marca-600) 0%,
-      var(--color-marca-500) 45%,
+      95deg,
+      var(--color-marca-700) 0%,
+      #0891b2 50%,
       var(--color-acento-500) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  @keyframes entrada-suave {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .anim-entrada {
+    animation: entrada-suave 0.2s ease-out;
   }
 
   .cartao {

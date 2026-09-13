@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { adicionarLead, removerLead } from "@/app/app/acoes";
 import { SeloPrioridade } from "./SeloPrioridade";
+import { BotaoGerarPrevia } from "./PainelPrevia";
 import { limparUrl, linkWhatsApp } from "@/lib/format";
 import type { EmpresaRadar } from "@/lib/types";
 
@@ -182,6 +183,7 @@ export function CartaoEmpresa({
                 Maps
               </a>
             )}
+            {!empresa.website && <BotaoGerarPrevia empresaId={empresa.id} empresaNome={empresa.nome} />}
           </div>
         </div>
       </div>

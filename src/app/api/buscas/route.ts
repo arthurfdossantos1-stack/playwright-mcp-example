@@ -4,6 +4,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { buscarEmpresas, detalharEmpresas, montarTermo, ErroPlaces } from "@/lib/places";
 import { descobrirInstagramEmLote } from "@/lib/instagram";
 import { avaliarRadar } from "@/lib/radar";
+import { validarWhatsapp } from "@/lib/whatsapp";
 import {
   chaveRateLimit,
   checarNoBanco,
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
         telefone: empresa.telefone,
       });
 
+      const whatsapp = validarWhatsapp(empresa.telefone);
+
       return {
         user_id: user.id,
         busca_id: busca.id,
@@ -136,6 +139,9 @@ export async function POST(request: Request) {
         prioridade: radar.prioridade,
         score_radar: radar.score,
         motivos_radar: radar.motivos,
+        whatsapp_e164: whatsapp.e164,
+        whatsapp_verificado: whatsapp.verificado,
+        fotos_total: empresa.totalFotos,
       };
     });
 

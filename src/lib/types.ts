@@ -96,6 +96,10 @@ export type Empresa = {
   prioridade: PrioridadeRadar;
   score_radar: number;
   motivos_radar: string[];
+  whatsapp_e164: string | null;
+  whatsapp_verificado: boolean;
+  contatado_fila_em: string | null;
+  fotos_total: number;
   criado_em: string;
 };
 
@@ -171,6 +175,19 @@ export type FollowUp = {
   mensagem: string | null;
   executado_em: string | null;
   criado_em: string;
+};
+
+export type PreviaSite = {
+  id: string;
+  user_id: string;
+  empresa_id: string;
+  modelo: string;
+  prompt_gerado: string;
+  criado_em: string;
+};
+
+export type PreviaSiteComEmpresa = PreviaSite & {
+  empresas: Pick<Empresa, "id" | "nome" | "website"> | null;
 };
 
 export type Interacao = {

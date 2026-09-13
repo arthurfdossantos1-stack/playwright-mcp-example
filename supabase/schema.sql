@@ -104,12 +104,22 @@ create table if not exists public.empresas (
   prioridade        prioridade_radar not null default 'baixa',
   score_radar       integer not null default 0,
   motivos_radar     jsonb not null default '[]'::jsonb,
+  -- Fila de WhatsApp (envio manual, ver enviar-mensagem): numero normalizado
+  -- e sinalizador de formato valido de celular BR, sem API paga de verificacao.
+  whatsapp_e164     text,
+  whatsapp_verificado boolean not null default false,
+  contatado_fila_em timestamptz,
+  -- Quantidade de fotos que o Place Details retornou (usado so como contexto
+  -- textual no prompt de previa de site, nunca baixamos as imagens).
+  fotos_total       integer not null default 0,
   criado_em         timestamptz not null default now(),
   unique (busca_id, place_id)
 );
 create index if not exists empresas_user_idx on public.empresas (user_id, criado_em desc);
 create index if not exists empresas_busca_idx on public.empresas (busca_id);
 create index if not exists empresas_prioridade_idx on public.empresas (user_id, prioridade);
+create index if not exists empresas_fila_whatsapp_idx
+  on public.empresas (user_id, whatsapp_verificado, contatado_fila_em, score_radar desc);
 
 -- ---------------------------------------------------------------------------
 -- leads: empresas selecionadas e movidas pelo funil
@@ -218,6 +228,23 @@ create table if not exists public.interacoes (
   criado_em timestamptz not null default now()
 );
 create index if not exists interacoes_lead_idx on public.interacoes (lead_id, criado_em desc);
+
+-- ---------------------------------------------------------------------------
+-- previas_site: historico de prompts de previa de site gerados por IA.
+-- Tambem serve de base pra cota diaria (5/dia): a cota e contada por linha
+-- criada hoje no fuso America/Sao_Paulo, sem tabela de contador mutavel.
+-- Nao e plano: e limite tecnico pra nao estourar a cota gratuita do Gemini.
+-- ---------------------------------------------------------------------------
+create table if not exists public.previas_site (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users (id) on delete cascade,
+  empresa_id    uuid not null references public.empresas (id) on delete cascade,
+  modelo        text not null default 'gemini',
+  prompt_gerado text not null,
+  criado_em     timestamptz not null default now()
+);
+create index if not exists previas_site_user_idx on public.previas_site (user_id, criado_em desc);
+create index if not exists previas_site_empresa_idx on public.previas_site (empresa_id, criado_em desc);
 
 -- ---------------------------------------------------------------------------
 -- rate_limit_eventos: controle TECNICO por usuario/IP.
@@ -330,6 +357,7 @@ alter table public.cadencia_etapas   enable row level security;
 alter table public.lead_cadencias    enable row level security;
 alter table public.follow_ups        enable row level security;
 alter table public.interacoes        enable row level security;
+alter table public.previas_site      enable row level security;
 alter table public.rate_limit_eventos enable row level security;
 
 -- Nota: as politicas usam (select auth.uid()) em vez de auth.uid() puro.
@@ -345,7 +373,8 @@ declare
 begin
   foreach t in array array[
     'projetos','buscas','empresas','leads','templates',
-    'cadencias','cadencia_etapas','lead_cadencias','follow_ups','interacoes'
+    'cadencias','cadencia_etapas','lead_cadencias','follow_ups','interacoes',
+    'previas_site'
   ] loop
     execute format('drop policy if exists %I on public.%I', t || '_owner', t);
     execute format(
