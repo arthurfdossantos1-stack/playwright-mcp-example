@@ -273,8 +273,6 @@ export function NavegacaoApp({
     </>
   );
 
-  const totalBadgesMobile = pendentes + filaWhatsapp;
-
   return (
     <>
       {/* Topo mobile */}
@@ -294,11 +292,6 @@ export function NavegacaoApp({
               <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
             )}
           </svg>
-          {!aberto && totalBadgesMobile > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
-              {totalBadgesMobile > 9 ? "9+" : totalBadgesMobile}
-            </span>
-          )}
         </button>
       </div>
 

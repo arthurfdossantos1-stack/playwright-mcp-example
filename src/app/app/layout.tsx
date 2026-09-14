@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { NavegacaoApp } from "@/components/app/NavegacaoApp";
+import { NavInferior } from "@/components/app/NavInferior";
 import { Migalhas } from "@/components/app/Migalhas";
 
 export const metadata: Metadata = {
@@ -48,11 +49,14 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         filaWhatsapp={filaWhatsapp ?? 0}
       />
       <div className="lg:pl-60">
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        {/* pb-24 no mobile abre espaço para a barra inferior fixa */}
+        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-8 lg:pb-10">
           <Migalhas />
           {children}
         </main>
       </div>
+
+      <NavInferior pendentes={pendentes ?? 0} filaWhatsapp={filaWhatsapp ?? 0} />
     </div>
   );
 }

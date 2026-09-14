@@ -11,9 +11,12 @@ export function CartaoEmpresa({
   empresa,
   selecionavel = false,
   selecionada = false,
+  destaque = false,
   aoSelecionar,
 }: {
   empresa: EmpresaRadar;
+  /** Primeiro da fila: ganha a fita colorida e mais peso visual. */
+  destaque?: boolean;
   selecionavel?: boolean;
   selecionada?: boolean;
   aoSelecionar?: (id: string, marcado: boolean) => void;
@@ -53,7 +56,13 @@ export function CartaoEmpresa({
   const whatsapp = linkWhatsApp(empresa.telefone);
 
   return (
-    <li className="cartao p-4 sm:p-5">
+    <li
+      className={
+        destaque
+          ? "cartao-acao cartao-acao--quente p-4 pt-5 sm:p-5 sm:pt-6"
+          : "cartao p-4 sm:p-5"
+      }
+    >
       <div className="flex flex-wrap items-start gap-3">
         {selecionavel && (
           <input

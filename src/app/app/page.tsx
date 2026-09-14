@@ -66,12 +66,22 @@ export default async function PaginaVisaoGeral() {
       <CabecalhoPagina
         titulo={nome ? `Olá, ${nome}` : "Visão geral"}
         descricao="Seu acesso é completo e ilimitado. Comece por uma varredura nova ou retome de onde parou."
-        acao={
-          <Link href="/app/buscar" className="botao-primario !px-4 !py-2 !text-sm">
-            Nova varredura
-          </Link>
-        }
       />
+
+      {/* A ação principal da tela ganha o bloco mais pesado, não um botão no canto. */}
+      <div className="cartao-acao mb-4 bg-gradient-to-b from-marca-50 to-white p-5">
+        <h2 className="font-titulo text-base font-bold text-slate-900">Nova varredura</h2>
+        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+          Nicho + cidade, sem limite de resultados.
+        </p>
+        <Link href="/app/buscar" className="botao-primario mt-3.5 w-full sm:w-auto">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.1">
+            <circle cx="11" cy="11" r="6.2" />
+            <path d="M15.8 15.8 20.4 20.4" strokeLinecap="round" />
+          </svg>
+          Buscar empresas
+        </Link>
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
@@ -80,9 +90,13 @@ export default async function PaginaVisaoGeral() {
           { valor: leads.length, rotulo: "leads no funil", href: "/app/leads" },
           { valor: followUps.length, rotulo: "follow-ups vencidos", href: "/app/leads" },
         ].map((kpi) => (
-          <Link key={kpi.rotulo} href={kpi.href} className="cartao p-4 transition hover:shadow-md">
-            <p className="text-2xl font-bold leading-none text-slate-900">{kpi.valor}</p>
-            <p className="mt-1.5 text-xs text-slate-500">{kpi.rotulo}</p>
+          <Link
+            key={kpi.rotulo}
+            href={kpi.href}
+            className="tile-num transition hover:border-slate-300 hover:shadow-sm"
+          >
+            <strong className="text-slate-900">{kpi.valor}</strong>
+            <span>{kpi.rotulo}</span>
           </Link>
         ))}
       </div>

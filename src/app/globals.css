@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* Interface: Instrument Sans. Títulos: Bricolage Grotesque (ver layout.tsx). */
+  --font-sans: var(--fonte-interface), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-titulo: var(--fonte-titulo), var(--fonte-interface), ui-sans-serif, system-ui,
+    sans-serif;
 
   /* Tom de destaque do RastroLead */
   --color-marca-50: #eff6ff;
@@ -32,6 +35,14 @@
     color: #0f172a;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Títulos carregam a fonte de display por padrão. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-titulo);
+    letter-spacing: -0.02em;
   }
 
   ::selection {
@@ -73,6 +84,78 @@
     border: 1px solid #e2e8f0;
     background-color: #ffffff;
     box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12);
+  }
+
+  /* ---------------------------------------------------------------------
+     Três pesos de bloco, para não cair no "todo card igual".
+     1. .cartao-acao  - o que a tela quer que você faça agora (um por tela)
+     2. .cartao       - conteúdo normal
+     3. .linha-lista  - item de lista: só filete, sem sombra nem borda
+     --------------------------------------------------------------------- */
+  .cartao-acao {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgb(15 23 42 / 0.05), 0 16px 40px -20px rgb(15 23 42 / 0.25);
+  }
+  /* Fita superior colorida: marca qual bloco é o principal da tela. */
+  .cartao-acao::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 3px;
+    background-color: var(--color-marca-600);
+  }
+  .cartao-acao--quente::before {
+    background-color: #f43f5e;
+  }
+  .cartao-acao--verde::before {
+    background-color: var(--color-acento-500);
+  }
+
+  .lista-filetes > * + * {
+    border-top: 1px solid #f1f5f9;
+  }
+
+  /* Tile numérico: o bloco mais leve, para contagens. */
+  .tile-num {
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    padding: 0.75rem 0.625rem;
+  }
+  .tile-num strong {
+    display: block;
+    font-family: var(--font-titulo);
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .tile-num span {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.66rem;
+    line-height: 1.25;
+    color: #64748b;
+  }
+
+  /* Numerais 01-04 do "como funciona": vazados, grandes, sem virar ícone. */
+  .num-passo {
+    font-family: var(--font-titulo);
+    font-weight: 800;
+    font-size: 3.5rem;
+    line-height: 0.8;
+    letter-spacing: -0.04em;
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--color-marca-200);
+  }
+
+  .textura-pontos {
+    background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0);
+    background-size: 22px 22px;
   }
 
   .botao-primario {

@@ -1,6 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { SITE } from "@/lib/site";
+
+/**
+ * Bricolage Grotesque nos títulos, Instrument Sans na interface.
+ * Inter saiu de propósito: é a fonte padrão de praticamente todo SaaS e era
+ * parte do que fazia o RastroLead parecer template genérico.
+ */
+const fonteTitulo = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--fonte-titulo",
+  display: "swap",
+});
+
+const fonteInterface = Instrument_Sans({
+  subsets: ["latin"],
+  variable: "--fonte-interface",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -44,7 +62,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={`${fonteTitulo.variable} ${fonteInterface.variable}`}>
       <body className="min-h-screen bg-white text-slate-900 antialiased">{children}</body>
     </html>
   );

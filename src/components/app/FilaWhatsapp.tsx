@@ -178,66 +178,90 @@ export function FilaWhatsapp({
             </button>
           </div>
         ) : atual ? (
-          <div className="cartao p-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">{atual.nome}</h2>
-              <SeloPrioridade prioridade={atual.prioridade} />
+          /* Bloco dominante da tela: é o único lead que importa agora. */
+          <div className="cartao-acao cartao-acao--verde">
+            <div className="flex items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-4 py-2.5">
+              <span className="font-titulo text-[11.5px] font-extrabold tracking-wider text-acento-600">
+                AGORA
+              </span>
+              <span className="ml-auto text-[11.5px] font-semibold text-acento-600">
+                1 de {fila.length}
+              </span>
             </div>
-            {atual.endereco && <p className="mt-1 text-sm text-slate-600">{atual.endereco}</p>}
-            <p className="mt-1 text-sm text-slate-500">{atual.telefone}</p>
 
-            {mensagem && (
-              <div className="mt-4">
-                <p className="mb-1.5 text-xs font-semibold text-slate-500">Mensagem que vai ser aberta</p>
-                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
-                  {mensagem}
-                </pre>
+            <div className="p-5">
+              <h2 className="font-titulo text-xl font-bold text-slate-900">{atual.nome}</h2>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-slate-700">{atual.telefone}</span>
+                <SeloPrioridade prioridade={atual.prioridade} />
               </div>
-            )}
+              {atual.endereco && <p className="mt-1.5 text-sm text-slate-600">{atual.endereco}</p>}
 
-            <button
-              type="button"
-              onClick={enviarMensagem}
-              disabled={processando || !template}
-              className="botao-primario mt-5 w-full text-base"
-            >
+              {mensagem && (
+                <div className="mt-4">
+                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Mensagem que vai abrir
+                  </p>
+                  <pre className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+                    {mensagem}
+                  </pre>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={enviarMensagem}
+                disabled={processando || !template}
+                className="botao-primario mt-4 w-full !bg-acento-600 !py-3.5 text-base hover:!bg-emerald-700"
+              >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
                 <path d="M12.04 2c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.44 1.32 4.94L2 22l5.24-1.38a9.9 9.9 0 0 0 4.8 1.22h.01c5.5 0 9.96-4.46 9.96-9.96S17.54 2 12.04 2Zm5.87 14.24c-.25.7-1.45 1.34-2 1.42-.51.08-1.16.11-1.87-.12-.43-.14-.98-.32-1.69-.63-2.98-1.29-4.92-4.3-5.07-4.5-.15-.2-1.22-1.62-1.22-3.09 0-1.47.77-2.19 1.05-2.49.27-.3.6-.37.8-.37h.57c.18 0 .43-.07.67.51.25.6.85 2.07.92 2.22.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.6.17.3.77 1.28 1.66 2.07 1.14 1.02 2.1 1.34 2.4 1.5.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.28.1 1.75.83 2.05.98.3.15.5.22.57.35.07.13.07.75-.18 1.45Z" />
               </svg>
-              {!template ? "Crie um template para começar" : "Enviar mensagem"}
-            </button>
+                {!template ? "Crie um template para começar" : "Abrir WhatsApp"}
+              </button>
 
-            {!template && (
-              <p className="mt-2 text-xs text-slate-500">
-                <Link href="/app/templates" className="font-semibold text-marca-700 hover:underline">
-                  Criar um template
-                </Link>{" "}
-                de canal WhatsApp para liberar o envio.
+              <p className="mt-2.5 text-center text-[11.5px] leading-relaxed text-slate-500">
+                Você envia com a mão. Ao voltar pra cá, marcamos como contatado e a fila anda
+                sozinha.
               </p>
-            )}
+
+              {!template && (
+                <p className="mt-2 text-xs text-slate-500">
+                  <Link href="/app/templates" className="font-semibold text-marca-700 hover:underline">
+                    Criar um template
+                  </Link>{" "}
+                  de canal WhatsApp para liberar o envio.
+                </p>
+              )}
+            </div>
           </div>
         ) : null}
       </div>
 
+      {/* Peso leve de propósito: a fila é contexto, não a ação da vez. */}
       <div>
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
-          Próximos na fila ({fila.length})
-        </h3>
-        <ul className="space-y-2">
-          {fila.slice(pendente ? 0 : 1, 8).map((item) => (
-            <li key={item.id} className="cartao flex items-center gap-3 p-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">
-                {item.nome.slice(0, 2).toUpperCase()}
+        <div className="mb-2 flex items-center gap-3">
+          <h3 className="text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
+            Próximos
+          </h3>
+          <span className="h-px flex-1 bg-slate-200" />
+          <span className="text-[11.5px] text-slate-400">{fila.length} na fila</span>
+        </div>
+        <ul className="lista-filetes">
+          {fila.slice(pendente ? 0 : 1, 8).map((item, indice) => (
+            <li key={item.id} className="flex items-center gap-3 py-2.5">
+              <span className="w-4 shrink-0 font-titulo text-xs font-extrabold text-slate-300">
+                {indice + 2}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-slate-800">{item.nome}</p>
-                <p className="truncate text-xs text-slate-500">{item.telefone}</p>
+                <p className="truncate text-xs text-slate-400">{item.telefone}</p>
               </div>
               <SeloPrioridade prioridade={item.prioridade} />
             </li>
           ))}
           {fila.length > 8 && (
-            <li className="px-3 py-2 text-center text-xs text-slate-400">
+            <li className="py-2.5 text-center text-xs text-slate-400">
               +{fila.length - 8} na fila
             </li>
           )}

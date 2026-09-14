@@ -59,17 +59,18 @@ export default async function PaginaRadar() {
               { valor: poucasAvaliacoes, rotulo: "com poucas avaliações" },
               { valor: semInstagram, rotulo: "sem Instagram" },
             ].map((kpi) => (
-              <div key={kpi.rotulo} className="cartao p-4">
-                <p className="text-2xl font-bold leading-none text-slate-900">{kpi.valor}</p>
-                <p className="mt-1.5 text-xs text-slate-500">{kpi.rotulo}</p>
+              <div key={kpi.rotulo} className="tile-num">
+                <strong className="text-slate-900">{kpi.valor}</strong>
+                <span>{kpi.rotulo}</span>
               </div>
             ))}
           </div>
 
-          <div className="cartao mb-5 p-4 text-sm text-slate-600">
-            <strong className="font-semibold text-slate-900">Como o Radar decide:</strong> empresa
-            sem site vira prioridade alta; poucas avaliações no Google levam à média-alta; ausência
-            de Instagram soma como média. Quem ainda não entrou no funil fica marcado como intocado.
+          {/* Nota de método: filete tracejado, o bloco mais leve da tela. */}
+          <div className="mb-5 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm leading-relaxed text-slate-600">
+            <strong className="font-semibold text-slate-900">Como o Radar ordena:</strong> sem site
+            pesa mais, poucas avaliações vêm em seguida, ausência de Instagram soma. Quem já está no
+            funil sai da fila.
           </div>
 
           <ListaResultados empresas={empresas} />

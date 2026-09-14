@@ -48,6 +48,12 @@ const DORES = [
   },
 ];
 
+/**
+ * Contorno de cada numeral: azul → vermelho (Radar) → azul-claro → verde,
+ * acompanhando a jornada do lead até o fechamento.
+ */
+const CORES_PASSO = ["#bfdbfe", "#fecdd3", "#bae6fd", "#a7f3d0"];
+
 const PASSOS = [
   {
     numero: "01",
@@ -160,8 +166,10 @@ export default function LandingPage() {
             aria-hidden="true"
           />
           <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-14 sm:px-6 sm:pb-20 sm:pt-20">
+            {/* min-w-0 nos dois itens: sem isso o mockup (min-content ~413px)
+                estica a trilha do grid e o texto do hero fica cortado no celular. */}
             <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
-              <div>
+              <div className="min-w-0">
                 <span className="inline-flex items-center gap-2 rounded-full border border-marca-200 bg-marca-50 px-3 py-1 text-xs font-semibold text-marca-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-acento-500" />
                   Gratuito, sem planos e sem limite de uso
@@ -205,7 +213,9 @@ export default function LandingPage() {
                 </dl>
               </div>
 
-              <div className="lg:pl-4">
+              {/* O mockup não encolhe abaixo de ~413px; em telas estreitas ele
+                  rola dentro da própria caixa em vez de ser cortado. */}
+              <div className="rolagem-suave min-w-0 overflow-x-auto pb-1 lg:overflow-visible lg:pl-4">
                 <MockupDashboard />
               </div>
             </div>
@@ -250,16 +260,22 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="mt-12 grid gap-5 md:grid-cols-3">
+            {/* Linhas com filete, não três cards iguais: o peso fica no texto. */}
+            <div className="mx-auto mt-12 max-w-3xl">
               {DORES.map((dor) => (
-                <div key={dor.titulo} className="cartao p-6">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-rose-50 text-rose-600">
+                <div
+                  key={dor.titulo}
+                  className="flex gap-4 border-t border-slate-200 py-5 last:border-b sm:gap-5"
+                >
+                  <span className="mt-0.5 shrink-0 text-rose-500">
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
                       {dor.icone}
                     </svg>
                   </span>
-                  <h3 className="mt-4 text-base font-bold text-slate-900">{dor.titulo}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{dor.texto}</p>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{dor.titulo}</h3>
+                    <p className="mt-1.5 text-[0.95rem] leading-relaxed text-slate-600">{dor.texto}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -278,14 +294,26 @@ export default function LandingPage() {
               </h2>
             </div>
 
-            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {PASSOS.map((passo) => (
-                <div key={passo.numero} className="cartao relative p-6">
-                  <span className="text-[2rem] font-extrabold leading-none text-marca-100">
+            {/* Numerais vazados e grandes: viram estrutura visual, não enfeite. */}
+            <div className="mx-auto mt-12 max-w-4xl">
+              {PASSOS.map((passo, indice) => (
+                <div
+                  key={passo.numero}
+                  className="flex items-start gap-5 border-t border-slate-200 bg-white px-4 py-6 last:border-b sm:gap-7 sm:px-6"
+                >
+                  <span
+                    className="num-passo shrink-0"
+                    style={{ WebkitTextStrokeColor: CORES_PASSO[indice] }}
+                    aria-hidden="true"
+                  >
                     {passo.numero}
                   </span>
-                  <h3 className="mt-3 text-lg font-bold text-slate-900">{passo.titulo}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{passo.texto}</p>
+                  <div className="pt-1">
+                    <h3 className="text-xl font-bold text-slate-900">{passo.titulo}</h3>
+                    <p className="mt-2 max-w-xl text-[0.95rem] leading-relaxed text-slate-600">
+                      {passo.texto}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -397,11 +425,18 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ CTA FINAL */}
         <section className="px-4 pb-20 sm:px-6">
-          <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-marca-700 via-marca-600 to-acento-600 px-6 py-16 text-center sm:px-12">
+          {/* Fundo escuro com textura de pontos no lugar do gradiente largo:
+              o gradiente fica só no headline do hero, onde ele significa algo. */}
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-slate-950 px-6 py-16 text-center sm:px-12">
+            <span
+              className="textura-pontos pointer-events-none absolute inset-0 text-slate-800"
+              aria-hidden="true"
+            />
+            <div className="relative">
             <h2 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
               Comece agora, gratuito
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-[1.0625rem] leading-relaxed text-marca-50/90">
+            <p className="mx-auto mt-4 max-w-xl text-[1.0625rem] leading-relaxed text-slate-400">
               Crie sua conta, escolha um nicho e uma cidade e rode a primeira varredura em menos de
               um minuto. Sem cartão, sem plano, sem limite.
             </p>
@@ -417,10 +452,11 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/guia-prospeccao-b2b"
-                className="inline-flex items-center justify-center rounded-xl border border-white/40 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center justify-center rounded-xl border border-white/25 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
               >
                 Ler o guia de prospecção
               </Link>
+            </div>
             </div>
           </div>
         </section>

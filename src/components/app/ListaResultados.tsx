@@ -155,11 +155,14 @@ export function ListaResultados({ empresas }: { empresas: EmpresaRadar[] }) {
         </p>
       ) : (
         <ul className="space-y-3">
-          {filtradas.map((empresa) => (
+          {filtradas.map((empresa, indice) => (
             <CartaoEmpresa
               key={empresa.id}
               empresa={empresa}
               selecionavel
+              /* A lista já vem ordenada pelo Radar: o primeiro é a maior
+                 oportunidade, então ele carrega o peso visual da tela. */
+              destaque={indice === 0 && empresa.prioridade === "alta"}
               selecionada={selecionadas.has(empresa.id)}
               aoSelecionar={alternar}
             />
