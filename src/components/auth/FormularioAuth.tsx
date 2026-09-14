@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { criarClienteSupabase } from "@/lib/supabase/client";
 import { Logo } from "@/components/marketing/Logo";
+import { avaliarForcaSenha } from "@/lib/senha";
 
 type Modo = "login" | "cadastro" | "recuperar";
 
@@ -35,16 +36,26 @@ export function FormularioAuth() {
     modoInicial === "cadastro" || modoInicial === "recuperar" ? modoInicial : "login",
   );
   const [email, setEmail] = useState("");
+  const [confirmacaoEmail, setConfirmacaoEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmacaoSenha, setConfirmacaoSenha] = useState("");
   const [nome, setNome] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
+  const forca = avaliarForcaSenha(senha);
+  const emailsDivergem =
+    modo === "cadastro" && confirmacaoEmail.length > 0 && email.trim() !== confirmacaoEmail.trim();
+  const senhasDivergem =
+    modo === "cadastro" && confirmacaoSenha.length > 0 && senha !== confirmacaoSenha;
+
   function trocarModo(novo: Modo) {
     setModo(novo);
     setErro(null);
     setAviso(null);
+    setConfirmacaoEmail("");
+    setConfirmacaoSenha("");
   }
 
   async function aoEnviar(evento: React.FormEvent) {
@@ -64,12 +75,24 @@ export function FormularioAuth() {
       }
 
       if (modo === "cadastro") {
+        if (email.trim() !== confirmacaoEmail.trim()) {
+          setErro("Os e-mails não conferem. Confira os dois campos.");
+          return;
+        }
+        if (senha !== confirmacaoSenha) {
+          setErro("As senhas não conferem.");
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password: senha,
           options: {
             data: { full_name: nome || null },
-            emailRedirectTo: `${window.location.origin}/auth/callback?proximo=${encodeURIComponent(proximo)}`,
+            // Leva pra uma pagina de confirmacao que NAO exige sessao. O link do
+            // e-mail costuma abrir no navegador interno do app de e-mail, onde a
+            // sessao criada nao serve pro navegador de verdade do usuario.
+            emailRedirectTo: `${window.location.origin}/auth/callback?proximo=/auth/confirmado`,
           },
         });
         if (error) throw error;
@@ -197,6 +220,31 @@ export function FormularioAuth() {
             />
           </div>
 
+          {modo === "cadastro" && (
+            <div>
+              <label className="rotulo" htmlFor="confirmar-email">
+                Confirme o e-mail
+              </label>
+              <input
+                id="confirmar-email"
+                type="email"
+                required
+                className="campo"
+                value={confirmacaoEmail}
+                onChange={(e) => setConfirmacaoEmail(e.target.value)}
+                placeholder="digite o mesmo e-mail"
+                autoComplete="off"
+                onPaste={(e) => e.preventDefault()}
+                aria-invalid={emailsDivergem}
+              />
+              {emailsDivergem && (
+                <p className="mt-1.5 text-xs font-medium text-rose-600">
+                  Os e-mails não conferem.
+                </p>
+              )}
+            </div>
+          )}
+
           {modo !== "recuperar" && (
             <div>
               <div className="flex items-center justify-between">
@@ -221,9 +269,60 @@ export function FormularioAuth() {
                 className="campo"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
-                placeholder="Mínimo de 6 caracteres"
+                placeholder={modo === "cadastro" ? "Pelo menos 8 caracteres" : "Sua senha"}
                 autoComplete={modo === "cadastro" ? "new-password" : "current-password"}
               />
+
+              {modo === "cadastro" && senha.length > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-1.5 flex-1 gap-1" aria-hidden="true">
+                      {[0, 1, 2, 3].map((i) => (
+                        <span
+                          key={i}
+                          className={`h-full flex-1 rounded-full transition-colors ${
+                            i < forca.score ? forca.cor : "bg-slate-200"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="w-20 shrink-0 text-right text-[11px] font-semibold text-slate-600">
+                      {forca.rotulo}
+                    </span>
+                  </div>
+                  <p className="sr-only" role="status">
+                    Força da senha: {forca.rotulo}
+                  </p>
+                  {forca.sugestoes.length > 0 && (
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Para reforçar: {forca.sugestoes.join(", ")}.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {modo === "cadastro" && (
+            <div>
+              <label className="rotulo" htmlFor="confirmar-senha">
+                Confirme a senha
+              </label>
+              <input
+                id="confirmar-senha"
+                type="password"
+                required
+                minLength={6}
+                className="campo"
+                value={confirmacaoSenha}
+                onChange={(e) => setConfirmacaoSenha(e.target.value)}
+                placeholder="digite a mesma senha"
+                autoComplete="new-password"
+                aria-invalid={senhasDivergem}
+              />
+              {senhasDivergem && (
+                <p className="mt-1.5 text-xs font-medium text-rose-600">As senhas não conferem.</p>
+              )}
             </div>
           )}
 
@@ -238,7 +337,11 @@ export function FormularioAuth() {
             </p>
           )}
 
-          <button type="submit" disabled={carregando} className="botao-primario w-full">
+          <button
+            type="submit"
+            disabled={carregando || emailsDivergem || senhasDivergem}
+            className="botao-primario w-full"
+          >
             {carregando
               ? "Aguarde…"
               : modo === "cadastro"
