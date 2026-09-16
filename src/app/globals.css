@@ -1,5 +1,126 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   Tema escuro
+   ---------------------------------------------------------------------------
+   Em vez de espalhar `dark:` por ~440 usos de cor, redefinimos os TOKENS de
+   cor na raiz. No Tailwind v4 toda utilitária vira `var(--color-…)`, então
+   trocar a variável gira a interface inteira de uma vez — e telas novas já
+   nascem com tema escuro sem ninguém lembrar de anotar nada.
+
+   Regra de leitura que continua valendo nos dois temas:
+   `bg-white` = superfície, `text-slate-900` = texto forte,
+   `text-slate-500` = texto fraco, `border-slate-200` = filete.
+
+   `data-theme` no <html> manda; sem ele, seguimos a preferência do sistema.
+   =========================================================================== */
+
+/* Tokens do tema escuro aplicados por escolha explicita... */
+:root[data-theme="dark"] {
+    --color-white: #141a23;
+    --color-slate-50: #1b222d;
+    --color-slate-100: #222a36;
+    --color-slate-200: #2c3543;
+    --color-slate-300: #3b4655;
+    --color-slate-400: #6b7787;
+    --color-slate-500: #8b97a8;
+    --color-slate-600: #a7b2c2;
+    --color-slate-700: #c2ccd9;
+    --color-slate-800: #dbe3ec;
+    --color-slate-900: #eef2f7;
+    --color-slate-950: #f8fafc;
+    --color-marca-50: #152337;
+    --color-marca-100: #1b2f49;
+    --color-marca-200: #26425f;
+    --color-marca-300: #3f6690;
+    --color-marca-700: #93c5fd;
+    --color-marca-800: #bfdbfe;
+    --color-marca-900: #dbeafe;
+    --color-rose-50: #2b1720;
+    --color-rose-100: #3a1d29;
+    --color-rose-200: #4d2735;
+    --color-rose-600: #fb7185;
+    --color-rose-700: #fda4af;
+    --color-rose-800: #fecdd3;
+    --color-emerald-50: #10241d;
+    --color-emerald-100: #153026;
+    --color-emerald-200: #1d4234;
+    --color-emerald-600: #34d399;
+    --color-emerald-700: #6ee7b7;
+    --color-emerald-800: #a7f3d0;
+    --color-amber-50: #2a2010;
+    --color-amber-100: #382a13;
+    --color-amber-200: #4a3717;
+    --color-amber-600: #fbbf24;
+    --color-amber-700: #fcd34d;
+    --color-amber-800: #fde68a;
+    --color-amber-900: #fef3c7;
+    --color-violet-50: #1f1833;
+    --color-violet-100: #291f45;
+    --color-violet-200: #372a5c;
+    --color-violet-700: #c4b5fd;
+    --color-sky-50: #0d2130;
+    --color-sky-200: #1d3f58;
+    --color-sky-700: #7dd3fc;
+  --cor-fundo-pagina: #0b0f16;
+  --cor-sombra-cartao: rgb(0 0 0 / 0.55);
+  color-scheme: dark;
+}
+
+/* ...e por preferencia do sistema, a menos que a pessoa tenha pedido claro. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-white: #141a23;
+    --color-slate-50: #1b222d;
+    --color-slate-100: #222a36;
+    --color-slate-200: #2c3543;
+    --color-slate-300: #3b4655;
+    --color-slate-400: #6b7787;
+    --color-slate-500: #8b97a8;
+    --color-slate-600: #a7b2c2;
+    --color-slate-700: #c2ccd9;
+    --color-slate-800: #dbe3ec;
+    --color-slate-900: #eef2f7;
+    --color-slate-950: #f8fafc;
+    --color-marca-50: #152337;
+    --color-marca-100: #1b2f49;
+    --color-marca-200: #26425f;
+    --color-marca-300: #3f6690;
+    --color-marca-700: #93c5fd;
+    --color-marca-800: #bfdbfe;
+    --color-marca-900: #dbeafe;
+    --color-rose-50: #2b1720;
+    --color-rose-100: #3a1d29;
+    --color-rose-200: #4d2735;
+    --color-rose-600: #fb7185;
+    --color-rose-700: #fda4af;
+    --color-rose-800: #fecdd3;
+    --color-emerald-50: #10241d;
+    --color-emerald-100: #153026;
+    --color-emerald-200: #1d4234;
+    --color-emerald-600: #34d399;
+    --color-emerald-700: #6ee7b7;
+    --color-emerald-800: #a7f3d0;
+    --color-amber-50: #2a2010;
+    --color-amber-100: #382a13;
+    --color-amber-200: #4a3717;
+    --color-amber-600: #fbbf24;
+    --color-amber-700: #fcd34d;
+    --color-amber-800: #fde68a;
+    --color-amber-900: #fef3c7;
+    --color-violet-50: #1f1833;
+    --color-violet-100: #291f45;
+    --color-violet-200: #372a5c;
+    --color-violet-700: #c4b5fd;
+    --color-sky-50: #0d2130;
+    --color-sky-200: #1d3f58;
+    --color-sky-700: #7dd3fc;
+    --cor-fundo-pagina: #0b0f16;
+    --cor-sombra-cartao: rgb(0 0 0 / 0.55);
+    color-scheme: dark;
+  }
+}
+
 @theme {
   /* Interface: Instrument Sans. Títulos: Bricolage Grotesque (ver layout.tsx). */
   --font-sans: var(--fonte-interface), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
@@ -31,8 +152,8 @@
   }
 
   body {
-    background-color: #ffffff;
-    color: #0f172a;
+    background-color: var(--cor-fundo-pagina, #ffffff);
+    color: var(--color-slate-900);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
@@ -81,9 +202,10 @@
 
   .cartao {
     border-radius: 1rem;
-    border: 1px solid #e2e8f0;
-    background-color: #ffffff;
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12);
+    border: 1px solid var(--color-slate-200);
+    background-color: var(--color-white);
+    box-shadow: 0 1px 2px var(--cor-sombra-cartao, rgb(15 23 42 / 0.04)),
+      0 8px 24px -12px rgb(15 23 42 / 0.12);
   }
 
   /* ---------------------------------------------------------------------
@@ -96,9 +218,10 @@
     position: relative;
     overflow: hidden;
     border-radius: 1rem;
-    border: 1px solid #e2e8f0;
-    background-color: #ffffff;
-    box-shadow: 0 2px 4px rgb(15 23 42 / 0.05), 0 16px 40px -20px rgb(15 23 42 / 0.25);
+    border: 1px solid var(--color-slate-200);
+    background-color: var(--color-white);
+    box-shadow: 0 2px 4px var(--cor-sombra-cartao, rgb(15 23 42 / 0.05)),
+      0 16px 40px -20px rgb(15 23 42 / 0.25);
   }
   /* Fita superior colorida: marca qual bloco é o principal da tela. */
   .cartao-acao::before {
@@ -117,7 +240,7 @@
   }
 
   .lista-filetes > * + * {
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--color-slate-100);
   }
 
   /* ---------------------------------------------------------------------
@@ -144,8 +267,8 @@
   /* Tile numérico: o bloco mais leve, para contagens. */
   .tile-num {
     border-radius: 0.75rem;
-    border: 1px solid #e2e8f0;
-    background-color: #ffffff;
+    border: 1px solid var(--color-slate-200);
+    background-color: var(--color-white);
     padding: 0.75rem 0.625rem;
   }
   .tile-num strong {
@@ -160,7 +283,7 @@
     margin-top: 0.25rem;
     font-size: 0.66rem;
     line-height: 1.25;
-    color: #64748b;
+    color: var(--color-slate-500);
   }
 
   /* Numerais 01-04 do "como funciona": vazados, grandes, sem virar ícone. */
@@ -191,9 +314,20 @@
     font-weight: 600;
     color: #ffffff;
     transition: background-color 0.15s ease, transform 0.15s ease;
+    /* Fica sobre azul nos dois temas: este branco NAO gira com o tema. */
   }
   .botao-primario:hover {
     background-color: var(--color-marca-700);
+  }
+  /* No escuro o token marca-700 e cor de link (azul claro): usar como fundo
+     deixaria o texto branco ilegivel. Ali o hover escurece. */
+  :root[data-theme="dark"] .botao-primario:hover {
+    background-color: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .botao-primario:hover {
+      background-color: #1d4ed8;
+    }
   }
   .botao-primario:active {
     transform: translateY(1px);
@@ -209,27 +343,27 @@
     justify-content: center;
     gap: 0.5rem;
     border-radius: 0.75rem;
-    border: 1px solid #e2e8f0;
-    background-color: #ffffff;
+    border: 1px solid var(--color-slate-200);
+    background-color: var(--color-white);
     padding: 0.7rem 1.25rem;
     font-size: 0.925rem;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--color-slate-900);
     transition: background-color 0.15s ease, border-color 0.15s ease;
   }
   .botao-secundario:hover {
-    background-color: #f8fafc;
-    border-color: #cbd5e1;
+    background-color: var(--color-slate-50);
+    border-color: var(--color-slate-300);
   }
 
   .campo {
     width: 100%;
     border-radius: 0.75rem;
-    border: 1px solid #e2e8f0;
-    background-color: #ffffff;
+    border: 1px solid var(--color-slate-200);
+    background-color: var(--color-white);
     padding: 0.65rem 0.875rem;
     font-size: 0.925rem;
-    color: #0f172a;
+    color: var(--color-slate-900);
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
@@ -238,7 +372,7 @@
     box-shadow: 0 0 0 3px var(--color-marca-100);
   }
   .campo::placeholder {
-    color: #94a3b8;
+    color: var(--color-slate-400);
   }
 
   .rotulo {
@@ -246,7 +380,7 @@
     margin-bottom: 0.375rem;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: #334155;
+    color: var(--color-slate-700);
   }
 
   .selo {
@@ -268,26 +402,26 @@
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.01em;
-    color: #0f172a;
+    color: var(--color-slate-900);
   }
   .prosa-artigo h3 {
     margin-top: 1.75rem;
     margin-bottom: 0.5rem;
     font-size: 1.15rem;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--color-slate-900);
   }
   .prosa-artigo p {
     margin-bottom: 1rem;
     line-height: 1.75;
-    color: #334155;
+    color: var(--color-slate-700);
   }
   .prosa-artigo ul,
   .prosa-artigo ol {
     margin-bottom: 1.25rem;
     padding-left: 1.25rem;
     line-height: 1.75;
-    color: #334155;
+    color: var(--color-slate-700);
   }
   .prosa-artigo ul {
     list-style: disc;
@@ -304,20 +438,20 @@
     text-underline-offset: 3px;
   }
   .prosa-artigo strong {
-    color: #0f172a;
+    color: var(--color-slate-900);
     font-weight: 650;
   }
   .prosa-artigo blockquote {
     margin: 1.5rem 0;
     border-left: 3px solid var(--color-marca-500);
-    background-color: #f8fafc;
+    background-color: var(--color-slate-50);
     padding: 0.875rem 1.125rem;
     border-radius: 0 0.5rem 0.5rem 0;
-    color: #475569;
+    color: var(--color-slate-600);
   }
   .prosa-artigo hr {
     margin: 2.5rem 0;
-    border-color: #e2e8f0;
+    border-color: var(--color-slate-200);
   }
   .prosa-artigo table {
     width: 100%;
@@ -327,17 +461,17 @@
   }
   .prosa-artigo th,
   .prosa-artigo td {
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--color-slate-200);
     padding: 0.5rem 0.75rem;
     text-align: left;
   }
   .prosa-artigo th {
-    background-color: #f8fafc;
+    background-color: var(--color-slate-50);
     font-weight: 650;
   }
   .prosa-artigo code {
     border-radius: 0.35rem;
-    background-color: #f1f5f9;
+    background-color: var(--color-slate-100);
     padding: 0.1rem 0.35rem;
     font-size: 0.875em;
   }
@@ -349,7 +483,7 @@
   width: 8px;
 }
 .rolagem-suave::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
+  background-color: var(--color-slate-300);
   border-radius: 999px;
 }
 .rolagem-suave::-webkit-scrollbar-track {

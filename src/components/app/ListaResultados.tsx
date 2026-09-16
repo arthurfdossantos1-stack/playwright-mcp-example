@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { LinhaEmpresa } from "./LinhaEmpresa";
 import { adicionarLeadsEmLote } from "@/app/app/acoes";
@@ -101,7 +102,7 @@ export function ListaResultados({ empresas }: { empresas: EmpresaRadar[] }) {
     iniciar(async () => {
       const resposta = await adicionarLeadsEmLote([...selecionadas]);
       if (resposta.ok) {
-        setAviso(`${total} empresa(s) enviada(s) para o funil.`);
+        setAviso(`${total} empresa(s) no funil — já estão na fila de mensagens.`);
         setSelecionadas(new Set());
       } else {
         setAviso(resposta.erro ?? "Não foi possível enviar as empresas.");
@@ -120,7 +121,7 @@ export function ListaResultados({ empresas }: { empresas: EmpresaRadar[] }) {
               onClick={() => setFiltro(item.id)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 filtro === item.id
-                  ? "bg-marca-600 text-white"
+                  ? "bg-marca-600 text-[#ffffff]"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -197,9 +198,15 @@ export function ListaResultados({ empresas }: { empresas: EmpresaRadar[] }) {
       </div>
 
       {aviso && (
-        <p className="mb-4 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700" role="status">
-          {aviso}
-        </p>
+        <div
+          className="anim-entrada mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700"
+          role="status"
+        >
+          <span>{aviso}</span>
+          <Link href="/app/enviar-mensagem" className="font-semibold underline">
+            Ir para a fila
+          </Link>
+        </div>
       )}
 
       {filtradas.length === 0 ? (

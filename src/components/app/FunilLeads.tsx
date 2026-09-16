@@ -262,7 +262,7 @@ function DetalheLead({
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/40"
+        className="absolute inset-0 bg-[#020617]/50"
         onClick={aoFechar}
         aria-label="Fechar"
       />

@@ -10,11 +10,29 @@ import type { Empresa, Template } from "@/lib/types";
 
 export type ItemFila = Pick<
   Empresa,
-  "id" | "nome" | "endereco" | "telefone" | "whatsapp_e164" | "nota" | "total_avaliacoes" | "instagram" | "website" | "prioridade"
+  | "id"
+  | "nome"
+  | "endereco"
+  | "telefone"
+  | "nota"
+  | "total_avaliacoes"
+  | "instagram"
+  | "website"
+  | "prioridade"
 > & {
+  /** Sempre preenchido: sem celular válido o lead nem entra na fila. */
+  whatsapp_e164: string;
+  /** Lead correspondente no funil — é ele que avança de status. */
+  leadId: string;
+  scoreRadar: number;
   nicho: string | null;
   cidade: string | null;
 };
+
+/** Item removido da fila que ainda dá para trazer de volta. */
+type Desfazivel = { item: ItemFila; posicao: number };
+
+const SEGUNDOS_PARA_DESFAZER = 8;
 
 export function FilaWhatsapp({
   filaInicial,
@@ -29,13 +47,10 @@ export function FilaWhatsapp({
   const [templateId, setTemplateId] = useState(
     templates.find((t) => t.canal === "whatsapp")?.id ?? templates[0]?.id ?? "",
   );
-  const [pendente, setPendente] = useState<ItemFila | null>(null);
-  const [processando, setProcessando] = useState(false);
-  const [aviso, setAviso] = useState<{ tipo: "sucesso" | "erro"; texto: string; empresa?: ItemFila } | null>(
-    null,
-  );
-  const pendenteRef = useRef<ItemFila | null>(null);
-  pendenteRef.current = pendente;
+  const [desfazivel, setDesfazivel] = useState<Desfazivel | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviados, setEnviados] = useState(0);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const template = templates.find((t) => t.id === templateId) ?? null;
   const atual = fila[0] ?? null;
@@ -48,70 +63,106 @@ export function FilaWhatsapp({
     );
   }, [atual, template, meuNome]);
 
-  const confirmarContato = useCallback(async (item: ItemFila) => {
-    setProcessando(true);
-    const resposta = await marcarContatadoFila(item.id);
-    setProcessando(false);
-    setPendente(null);
-
-    if (resposta.ok) {
-      setFila((atual) => atual.filter((e) => e.id !== item.id));
-      setAviso({ tipo: "sucesso", texto: `${item.nome} marcado como contatado.`, empresa: item });
-      setTimeout(() => setAviso((a) => (a?.empresa?.id === item.id ? null : a)), 6000);
-    } else {
-      setAviso({ tipo: "erro", texto: resposta.erro ?? "Não foi possível marcar como contatado." });
-    }
+  useEffect(() => {
+    return () => {
+      if (temporizador.current) clearTimeout(temporizador.current);
+    };
   }, []);
 
-  // Ao voltar pra aba (foco ou visibilidade), confirma o contato do item pendente.
-  useEffect(() => {
-    function aoRetornar() {
-      if (document.visibilityState !== "visible") return;
-      const item = pendenteRef.current;
-      if (item) confirmarContato(item);
-    }
+  /** Repõe um item na posição em que ele estava, sem duplicar. */
+  const repor = useCallback(({ item, posicao }: Desfazivel) => {
+    setFila((atual) => {
+      if (atual.some((e) => e.id === item.id)) return atual;
+      const copia = [...atual];
+      copia.splice(Math.min(posicao, copia.length), 0, item);
+      return copia;
+    });
+  }, []);
 
-    window.addEventListener("focus", aoRetornar);
-    document.addEventListener("visibilitychange", aoRetornar);
-    return () => {
-      window.removeEventListener("focus", aoRetornar);
-      document.removeEventListener("visibilitychange", aoRetornar);
-    };
-  }, [confirmarContato]);
+  function agendarLimpezaDoDesfazer() {
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = setTimeout(() => setDesfazivel(null), SEGUNDOS_PARA_DESFAZER * 1000);
+  }
 
+  /**
+   * Abre o WhatsApp e avança NA HORA.
+   *
+   * A versão anterior esperava você voltar para a aba (evento `focus` /
+   * `visibilitychange`) para só então chamar o servidor e trocar de lead. No
+   * celular esse evento falha com frequência — daí a sensação de travamento e
+   * a necessidade de clicar duas vezes. Agora a fila anda no clique e a
+   * gravação acontece por trás; se ela falhar, o lead volta sozinho.
+   */
   function enviarMensagem() {
-    if (!atual || !atual.whatsapp_e164) return;
-    setAviso(null);
+    if (!atual) return;
+
+    setErro(null);
     window.open(linkWaMe(atual.whatsapp_e164, mensagem), "_blank", "noopener,noreferrer");
-    setPendente(atual);
+
+    const item = atual;
+    setFila((lista) => lista.filter((e) => e.id !== item.id));
+    setEnviados((n) => n + 1);
+    setDesfazivel({ item, posicao: 0 });
+    agendarLimpezaDoDesfazer();
+
+    void marcarContatadoFila(item.id, item.leadId).then((resposta) => {
+      if (!resposta.ok) {
+        setErro(resposta.erro ?? "Não foi possível marcar como contatado.");
+        setEnviados((n) => Math.max(0, n - 1));
+        setDesfazivel((atual) => (atual?.item.id === item.id ? null : atual));
+        repor({ item, posicao: 0 });
+      }
+    });
   }
 
-  async function desfazer(item: ItemFila) {
-    setProcessando(true);
-    const resposta = await desfazerContatadoFila(item.id);
-    setProcessando(false);
-    if (resposta.ok) {
-      setFila((atual) => [item, ...atual]);
-      setAviso(null);
-    }
+  /** Manda o lead para o fim da fila, sem marcar nada no banco. */
+  function pular() {
+    if (!atual || fila.length < 2) return;
+    setErro(null);
+    setFila((lista) => [...lista.slice(1), lista[0]]);
   }
 
-  if (fila.length === 0) {
+  function desfazer() {
+    const alvo = desfazivel;
+    if (!alvo) return;
+    setDesfazivel(null);
+    setEnviados((n) => Math.max(0, n - 1));
+    repor(alvo);
+    void desfazerContatadoFila(alvo.item.id, alvo.item.leadId).then((resposta) => {
+      if (!resposta.ok) setErro(resposta.erro ?? "Não foi possível desfazer.");
+    });
+  }
+
+  if (!atual) {
     return (
       <div className="cartao px-6 py-14 text-center">
-        <span className="grid h-12 w-12 mx-auto place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <h2 className="mt-4 text-base font-bold text-slate-900">Fila vazia</h2>
+        <h2 className="mt-4 text-base font-bold text-slate-900">
+          {enviados > 0 ? "Fila zerada" : "Nenhum lead esperando mensagem"}
+        </h2>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-600">
-          Nenhuma empresa com WhatsApp verificado esperando contato agora. Rode uma nova varredura —
-          empresas com celular em formato válido entram aqui automaticamente.
+          {enviados > 0
+            ? `Você abriu ${enviados} conversa${enviados === 1 ? "" : "s"} agora. Envie mais leads para o funil quando quiser continuar.`
+            : "Esta fila é o seu funil. Vá aos resultados de uma varredura ou ao Radar, marque as empresas que interessam e clique em “Enviar para o funil” — quem tiver celular válido aparece aqui."}
         </p>
-        <Link href="/app/buscar" className="botao-primario mt-6">
-          Fazer uma varredura
-        </Link>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <Link href="/app/radar" className="botao-primario">
+            Abrir o Radar
+          </Link>
+          <Link href="/app/buscar" className="botao-secundario">
+            Fazer uma varredura
+          </Link>
+        </div>
+
+        {desfazivel && (
+          <button type="button" onClick={desfazer} className="mt-5 text-sm font-semibold text-marca-700 hover:underline">
+            Desfazer o último envio ({desfazivel.item.nome})
+          </button>
+        )}
       </div>
     );
   }
@@ -129,7 +180,6 @@ export function FilaWhatsapp({
               className="campo"
               value={templateId}
               onChange={(e) => setTemplateId(e.target.value)}
-              disabled={Boolean(pendente)}
             >
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -140,102 +190,94 @@ export function FilaWhatsapp({
           </div>
         )}
 
-        {aviso && (
+        {erro && (
+          <p className="anim-entrada mb-4 rounded-lg bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700" role="alert">
+            {erro}
+          </p>
+        )}
+
+        {desfazivel && (
           <div
-            className={`anim-entrada mb-4 flex items-center justify-between gap-3 rounded-lg px-3.5 py-2.5 text-sm ${
-              aviso.tipo === "sucesso" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-            }`}
+            className="anim-entrada mb-4 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800"
             role="status"
           >
-            <span>{aviso.texto}</span>
-            {aviso.tipo === "sucesso" && aviso.empresa && (
-              <button
-                type="button"
-                onClick={() => desfazer(aviso.empresa!)}
-                className="shrink-0 font-semibold underline"
-              >
-                Desfazer
-              </button>
-            )}
+            <span className="min-w-0 truncate">
+              <strong className="font-semibold">{desfazivel.item.nome}</strong> marcado como
+              contatado.
+            </span>
+            <button type="button" onClick={desfazer} className="shrink-0 font-semibold underline">
+              Desfazer
+            </button>
           </div>
         )}
 
-        {pendente ? (
-          <div className="cartao flex flex-col items-center gap-3 p-8 text-center">
-            <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-marca-200 border-t-marca-600" />
-            <p className="text-sm font-semibold text-slate-900">
-              Aguardando você voltar da conversa com {pendente.nome}…
-            </p>
-            <p className="text-xs text-slate-500">
-              Assim que você voltar pra essa aba, marcamos como contatado automaticamente.
-            </p>
+        {/* Bloco dominante da tela: é o único lead que importa agora. */}
+        <div className="cartao-acao cartao-acao--verde">
+          <div className="flex items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-4 py-2.5">
+            <span className="font-titulo text-[11.5px] font-extrabold tracking-wider text-acento-600">
+              AGORA
+            </span>
+            <span className="ml-auto text-[11.5px] font-semibold text-acento-600">
+              {enviados > 0 && `${enviados} enviada${enviados === 1 ? "" : "s"} · `}
+              {fila.length} na fila
+            </span>
+          </div>
+
+          <div className="p-5">
+            <h2 className="font-titulo text-xl font-bold text-slate-900">{atual.nome}</h2>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-700">{atual.telefone}</span>
+              <SeloPrioridade prioridade={atual.prioridade} />
+            </div>
+            {atual.endereco && <p className="mt-1.5 text-sm text-slate-600">{atual.endereco}</p>}
+
+            {mensagem && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Mensagem que vai abrir
+                </p>
+                <pre className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+                  {mensagem}
+                </pre>
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={() => setPendente(null)}
-              className="mt-1 text-xs font-medium text-slate-500 hover:underline"
+              onClick={enviarMensagem}
+              disabled={!template}
+              className="botao-primario mt-4 w-full !bg-acento-600 !py-3.5 text-base hover:!bg-emerald-700"
             >
-              Cancelar, não marcar
-            </button>
-          </div>
-        ) : atual ? (
-          /* Bloco dominante da tela: é o único lead que importa agora. */
-          <div className="cartao-acao cartao-acao--verde">
-            <div className="flex items-center gap-2 border-b border-emerald-200 bg-emerald-50 px-4 py-2.5">
-              <span className="font-titulo text-[11.5px] font-extrabold tracking-wider text-acento-600">
-                AGORA
-              </span>
-              <span className="ml-auto text-[11.5px] font-semibold text-acento-600">
-                1 de {fila.length}
-              </span>
-            </div>
-
-            <div className="p-5">
-              <h2 className="font-titulo text-xl font-bold text-slate-900">{atual.nome}</h2>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-slate-700">{atual.telefone}</span>
-                <SeloPrioridade prioridade={atual.prioridade} />
-              </div>
-              {atual.endereco && <p className="mt-1.5 text-sm text-slate-600">{atual.endereco}</p>}
-
-              {mensagem && (
-                <div className="mt-4">
-                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Mensagem que vai abrir
-                  </p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
-                    {mensagem}
-                  </pre>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={enviarMensagem}
-                disabled={processando || !template}
-                className="botao-primario mt-4 w-full !bg-acento-600 !py-3.5 text-base hover:!bg-emerald-700"
-              >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
                 <path d="M12.04 2c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.44 1.32 4.94L2 22l5.24-1.38a9.9 9.9 0 0 0 4.8 1.22h.01c5.5 0 9.96-4.46 9.96-9.96S17.54 2 12.04 2Zm5.87 14.24c-.25.7-1.45 1.34-2 1.42-.51.08-1.16.11-1.87-.12-.43-.14-.98-.32-1.69-.63-2.98-1.29-4.92-4.3-5.07-4.5-.15-.2-1.22-1.62-1.22-3.09 0-1.47.77-2.19 1.05-2.49.27-.3.6-.37.8-.37h.57c.18 0 .43-.07.67.51.25.6.85 2.07.92 2.22.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.6.17.3.77 1.28 1.66 2.07 1.14 1.02 2.1 1.34 2.4 1.5.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.28.1 1.75.83 2.05.98.3.15.5.22.57.35.07.13.07.75-.18 1.45Z" />
               </svg>
-                {!template ? "Crie um template para começar" : "Abrir WhatsApp"}
+              {!template ? "Crie um template para começar" : "Abrir WhatsApp e avançar"}
+            </button>
+
+            {fila.length > 1 && (
+              <button
+                type="button"
+                onClick={pular}
+                className="mt-2 w-full rounded-lg py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+              >
+                Pular por agora — volta pro fim da fila
               </button>
+            )}
 
-              <p className="mt-2.5 text-center text-[11.5px] leading-relaxed text-slate-500">
-                Você envia com a mão. Ao voltar pra cá, marcamos como contatado e a fila anda
-                sozinha.
+            <p className="mt-2.5 text-center text-[11.5px] leading-relaxed text-slate-500">
+              Você envia com a mão. A fila já pula pro próximo no clique.
+            </p>
+
+            {!template && (
+              <p className="mt-2 text-xs text-slate-500">
+                <Link href="/app/templates" className="font-semibold text-marca-700 hover:underline">
+                  Criar um template
+                </Link>{" "}
+                de canal WhatsApp para liberar o envio.
               </p>
-
-              {!template && (
-                <p className="mt-2 text-xs text-slate-500">
-                  <Link href="/app/templates" className="font-semibold text-marca-700 hover:underline">
-                    Criar um template
-                  </Link>{" "}
-                  de canal WhatsApp para liberar o envio.
-                </p>
-              )}
-            </div>
+            )}
           </div>
-        ) : null}
+        </div>
       </div>
 
       {/* Peso leve de propósito: a fila é contexto, não a ação da vez. */}
@@ -247,25 +289,27 @@ export function FilaWhatsapp({
           <span className="h-px flex-1 bg-slate-200" />
           <span className="text-[11.5px] text-slate-400">{fila.length} na fila</span>
         </div>
-        <ul className="lista-filetes">
-          {fila.slice(pendente ? 0 : 1, 8).map((item, indice) => (
-            <li key={item.id} className="flex items-center gap-3 py-2.5">
-              <span className="w-4 shrink-0 font-titulo text-xs font-extrabold text-slate-300">
-                {indice + 2}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-800">{item.nome}</p>
-                <p className="truncate text-xs text-slate-400">{item.telefone}</p>
-              </div>
-              <SeloPrioridade prioridade={item.prioridade} />
-            </li>
-          ))}
-          {fila.length > 8 && (
-            <li className="py-2.5 text-center text-xs text-slate-400">
-              +{fila.length - 8} na fila
-            </li>
-          )}
-        </ul>
+        {fila.length === 1 ? (
+          <p className="py-3 text-sm text-slate-500">Esse é o último da fila.</p>
+        ) : (
+          <ul className="lista-filetes">
+            {fila.slice(1, 8).map((item, indice) => (
+              <li key={item.id} className="flex items-center gap-3 py-2.5">
+                <span className="w-4 shrink-0 font-titulo text-xs font-extrabold text-slate-300">
+                  {indice + 2}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-800">{item.nome}</p>
+                  <p className="truncate text-xs text-slate-400">{item.telefone}</p>
+                </div>
+                <SeloPrioridade prioridade={item.prioridade} />
+              </li>
+            ))}
+            {fila.length > 8 && (
+              <li className="py-2.5 text-center text-xs text-slate-400">+{fila.length - 8} na fila</li>
+            )}
+          </ul>
+        )}
       </div>
     </div>
   );

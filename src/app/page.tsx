@@ -427,23 +427,23 @@ export default function LandingPage() {
         <section className="px-4 pb-20 sm:px-6">
           {/* Fundo escuro com textura de pontos no lugar do gradiente largo:
               o gradiente fica só no headline do hero, onde ele significa algo. */}
-          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-slate-950 px-6 py-16 text-center sm:px-12">
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-[#020617] px-6 py-16 text-center sm:px-12">
             <span
-              className="textura-pontos pointer-events-none absolute inset-0 text-slate-800"
+              className="textura-pontos pointer-events-none absolute inset-0 text-[#1e293b]"
               aria-hidden="true"
             />
             <div className="relative">
-            <h2 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            <h2 className="mx-auto max-w-2xl text-3xl font-extrabold tracking-tight text-[#ffffff] sm:text-4xl">
               Comece agora, gratuito
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-[1.0625rem] leading-relaxed text-slate-400">
+            <p className="mx-auto mt-4 max-w-xl text-[1.0625rem] leading-relaxed text-[#94a3b8]">
               Crie sua conta, escolha um nicho e uma cidade e rode a primeira varredura em menos de
               um minuto. Sem cartão, sem plano, sem limite.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/auth?modo=cadastro"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-marca-700 shadow-sm transition hover:bg-marca-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#ffffff] px-6 py-3 text-base font-semibold text-[#1d4ed8] shadow-sm transition hover:bg-[#eff6ff]"
               >
                 Criar conta gratuita
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -452,7 +452,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/guia-prospeccao-b2b"
-                className="inline-flex items-center justify-center rounded-xl border border-white/25 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex items-center justify-center rounded-xl border border-white/25 px-6 py-3 text-base font-semibold text-[#ffffff] transition hover:bg-white/10"
               >
                 Ler o guia de prospecção
               </Link>

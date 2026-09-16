@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { SITE } from "@/lib/site";
+import { ANTI_PISCADA } from "@/lib/tema";
+import { AvisoCookies } from "@/components/AvisoCookies";
 
 /**
  * Bricolage Grotesque nos títulos, Instrument Sans na interface.
@@ -63,7 +65,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" className={`${fonteTitulo.variable} ${fonteInterface.variable}`}>
-      <body className="min-h-screen bg-white text-slate-900 antialiased">{children}</body>
+      <head>
+        {/* Aplica o tema antes da primeira pintura: sem isso a tela pisca
+            branca por um quadro antes de virar escura. */}
+        <script dangerouslySetInnerHTML={{ __html: ANTI_PISCADA }} />
+      </head>
+      <body className="min-h-screen antialiased">
+        {children}
+        <AvisoCookies />
+      </body>
     </html>
   );
 }

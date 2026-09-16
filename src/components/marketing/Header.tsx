@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Logo } from "./Logo";
+import { AlternadorTema } from "@/components/AlternadorTema";
 
 const LINKS = [
   { href: "/#inicio", rotulo: "Início" },
@@ -32,6 +33,7 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
+          <AlternadorTema />
           <Link
             href="/auth"
             className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
@@ -43,10 +45,12 @@ export function Header() {
           </Link>
         </div>
 
+        <div className="flex items-center gap-2 md:hidden">
+          <AlternadorTema />
         <button
           type="button"
           onClick={() => setAberto((v) => !v)}
-          className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 text-slate-700 md:hidden"
+          className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 text-slate-700"
           aria-label={aberto ? "Fechar menu" : "Abrir menu"}
           aria-expanded={aberto}
         >
@@ -58,6 +62,7 @@ export function Header() {
             )}
           </svg>
         </button>
+        </div>
       </div>
 
       {aberto && (

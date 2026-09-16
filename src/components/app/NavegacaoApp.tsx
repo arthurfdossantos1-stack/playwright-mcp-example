@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/marketing/Logo";
+import { AlternadorTema } from "@/components/AlternadorTema";
 import { criarClienteSupabase } from "@/lib/supabase/client";
 
 type ItemNav = {
@@ -199,7 +200,7 @@ export function NavegacaoApp({
                     onClick={() => setAberto(false)}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition lg:py-2 ${
                       ativo
-                        ? "bg-marca-600 text-white shadow-sm"
+                        ? "bg-marca-600 text-[#ffffff] shadow-sm"
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                   >
@@ -235,7 +236,7 @@ export function NavegacaoApp({
           onClick={() => setAberto(false)}
           className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition lg:py-2 ${
             caminho.startsWith("/app/configuracoes")
-              ? "bg-marca-600 text-white shadow-sm"
+              ? "bg-marca-600 text-[#ffffff] shadow-sm"
               : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           }`}
         >
@@ -269,6 +270,11 @@ export function NavegacaoApp({
           </svg>
           Sair
         </button>
+
+        <div className="mt-2 flex items-center gap-2 px-3">
+          <AlternadorTema />
+          <span className="text-xs text-slate-500">Tema claro / escuro</span>
+        </div>
       </div>
     </>
   );
@@ -278,6 +284,8 @@ export function NavegacaoApp({
       {/* Topo mobile */}
       <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:hidden">
         <Logo href="/app" />
+        <div className="flex items-center gap-2">
+          <AlternadorTema />
         <button
           type="button"
           onClick={() => setAberto((v) => !v)}
@@ -293,13 +301,14 @@ export function NavegacaoApp({
             )}
           </svg>
         </button>
+        </div>
       </div>
 
       {aberto && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/30"
+            className="absolute inset-0 bg-[#020617]/40"
             onClick={() => setAberto(false)}
             aria-label="Fechar menu"
           />

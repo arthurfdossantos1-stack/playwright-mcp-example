@@ -724,17 +724,42 @@ export async function criarConteudoInicial(): Promise<Resposta> {
  * Marca a empresa como contatada pela fila de envio manual (/app/enviar-mensagem).
  * Independente do funil de leads: a fila roda direto sobre `empresas`.
  */
-export async function marcarContatadoFila(empresaId: string): Promise<Resposta> {
+export async function marcarContatadoFila(
+  empresaId: string,
+  leadId?: string | null,
+): Promise<Resposta> {
   try {
     const { supabase, user } = await exigirUsuario();
+    const agora = new Date().toISOString();
+
     const { error } = await supabase
       .from("empresas")
-      .update({ contatado_fila_em: new Date().toISOString() })
+      .update({ contatado_fila_em: agora })
       .eq("id", empresaId)
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/app/enviar-mensagem");
+    // A fila e o funil sao a mesma coisa: quem recebeu mensagem avanca de
+    // "novo" para "contatado" e ganha a interacao no historico do lead.
+    if (leadId) {
+      await supabase
+        .from("leads")
+        .update({ status: "contatado", ultimo_contato_em: agora })
+        .eq("id", leadId)
+        .eq("user_id", user.id)
+        .eq("status", "novo");
+
+      await supabase.from("interacoes").insert({
+        user_id: user.id,
+        lead_id: leadId,
+        canal: "whatsapp",
+        titulo: "Mensagem de WhatsApp aberta pela fila",
+      });
+    }
+
+    // Nao revalidamos /app/enviar-mensagem de proposito: a fila ja avancou no
+    // cliente e devolver a lista do servidor no meio da acao faz a tela piscar.
+    revalidatePath("/app/leads");
     return { ok: true };
   } catch (e) {
     return falha(e);
@@ -742,7 +767,10 @@ export async function marcarContatadoFila(empresaId: string): Promise<Resposta> 
 }
 
 /** Desfaz a marcação (o botão "Desfazer" logo após enviar). */
-export async function desfazerContatadoFila(empresaId: string): Promise<Resposta> {
+export async function desfazerContatadoFila(
+  empresaId: string,
+  leadId?: string | null,
+): Promise<Resposta> {
   try {
     const { supabase, user } = await exigirUsuario();
     const { error } = await supabase
@@ -752,7 +780,16 @@ export async function desfazerContatadoFila(empresaId: string): Promise<Resposta
       .eq("user_id", user.id);
     if (error) throw error;
 
-    revalidatePath("/app/enviar-mensagem");
+    if (leadId) {
+      await supabase
+        .from("leads")
+        .update({ status: "novo" })
+        .eq("id", leadId)
+        .eq("user_id", user.id)
+        .eq("status", "contatado");
+    }
+
+    revalidatePath("/app/leads");
     return { ok: true };
   } catch (e) {
     return falha(e);

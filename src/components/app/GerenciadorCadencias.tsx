@@ -85,7 +85,7 @@ export function GerenciadorCadencias({
                       key={etapa.id}
                       className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5"
                     >
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-marca-600 text-[11px] font-bold text-white">
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-marca-600 text-[11px] font-bold text-[#ffffff]">
                         {indice + 1}
                       </span>
                       <span className="text-sm font-semibold text-slate-800">
@@ -243,7 +243,7 @@ function EditorCadencia({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" className="absolute inset-0 bg-slate-900/40" onClick={aoFechar} aria-label="Fechar" />
+      <button type="button" className="absolute inset-0 bg-[#020617]/50" onClick={aoFechar} aria-label="Fechar" />
       <form
         onSubmit={enviar}
         className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl sm:rounded-2xl"

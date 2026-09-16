@@ -93,7 +93,7 @@ export default async function PaginaLeads({
           <Link
             href="/app/leads"
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-              !projeto ? "bg-marca-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              !projeto ? "bg-marca-600 text-[#ffffff]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             Todos os projetos
@@ -104,7 +104,7 @@ export default async function PaginaLeads({
               href={`/app/leads?projeto=${p.id}`}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 projeto === p.id
-                  ? "bg-marca-600 text-white"
+                  ? "bg-marca-600 text-[#ffffff]"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >

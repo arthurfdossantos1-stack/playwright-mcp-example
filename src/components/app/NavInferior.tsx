@@ -96,7 +96,7 @@ export function NavInferior({
                 {item.icone}
               </svg>
               {contagem > 0 && (
-                <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white">
+                <span className="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-[#ffffff]">
                   {contagem > 9 ? "9+" : contagem}
                 </span>
               )}

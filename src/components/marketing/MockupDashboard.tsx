@@ -63,7 +63,7 @@ export function MockupDashboard({ className = "" }: { className?: string }) {
         <aside className="hidden border-r border-slate-200 bg-slate-50/70 p-4 sm:block">
           <div className="mb-5 flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-marca-600 to-acento-500">
-              <svg viewBox="0 0 24 24" className="h-4 w-4 text-white">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#ffffff]">
                 <circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
                 <path d="M15.8 15.8 L20.5 20.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
@@ -82,7 +82,7 @@ export function MockupDashboard({ className = "" }: { className?: string }) {
             <div
               key={item.rotulo}
               className={`mb-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium ${
-                item.ativo ? "bg-marca-600 text-white" : "text-slate-500"
+                item.ativo ? "bg-marca-600 text-[#ffffff]" : "text-slate-500"
               }`}
             >
               {item.rotulo}
@@ -96,7 +96,7 @@ export function MockupDashboard({ className = "" }: { className?: string }) {
             <div className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-medium text-slate-600">
               clínica odontológica · Campinas — SP
             </div>
-            <div className="rounded-lg bg-marca-600 px-3 py-2 text-[11px] font-semibold text-white">
+            <div className="rounded-lg bg-marca-600 px-3 py-2 text-[11px] font-semibold text-[#ffffff]">
               Varrer
             </div>
           </div>

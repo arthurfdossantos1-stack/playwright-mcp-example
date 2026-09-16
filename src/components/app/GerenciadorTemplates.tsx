@@ -173,7 +173,7 @@ function EditorTemplate({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <button type="button" className="absolute inset-0 bg-slate-900/40" onClick={aoFechar} aria-label="Fechar" />
+      <button type="button" className="absolute inset-0 bg-[#020617]/50" onClick={aoFechar} aria-label="Fechar" />
       <form
         onSubmit={enviar}
         className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl sm:rounded-2xl"

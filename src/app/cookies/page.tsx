@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PaginaLegal } from "@/components/marketing/PaginaLegal";
+import { BotaoPreferenciasCookies } from "@/components/BotaoPreferenciasCookies";
 
 export const metadata: Metadata = {
   title: "Política de cookies",
@@ -78,6 +79,9 @@ export default function Cookies() {
       <h2>5. Contato</h2>
       <p>
         Dúvidas: <a href="mailto:contato@rastrolead.com.br">contato@rastrolead.com.br</a>.
+      </p>
+      <p className="not-prose mt-8">
+        <BotaoPreferenciasCookies />
       </p>
     </PaginaLegal>
   );

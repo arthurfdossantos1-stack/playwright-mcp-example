@@ -39,16 +39,16 @@ export async function PaginaArtigo({ artigo }: { artigo: Artigo }) {
         />
 
         <aside className="mt-14 rounded-2xl bg-gradient-to-br from-marca-700 via-marca-600 to-acento-600 px-6 py-10 text-center sm:px-10">
-          <h2 className="text-2xl font-bold tracking-tight text-white">
+          <h2 className="text-2xl font-bold tracking-tight text-[#ffffff]">
             Coloque em prática no RastroLead
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-marca-50/90">
+          <p className="mx-auto mt-3 max-w-md text-[#eff6ff]/90">
             Varredura por nicho e cidade, Radar de Oportunidades, templates e cadências. Gratuito,
             sem planos e sem limite de uso.
           </p>
           <Link
             href="/auth?modo=cadastro"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-marca-700 transition hover:bg-marca-50"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#ffffff] px-6 py-3 font-semibold text-[#1d4ed8] transition hover:bg-[#eff6ff]"
           >
             Criar conta gratuita
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
