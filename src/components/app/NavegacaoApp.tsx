@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/marketing/Logo";
 import { AlternadorTema } from "@/components/AlternadorTema";
+import { IndicadorLink } from "./IndicadorLink";
 import { criarClienteSupabase } from "@/lib/supabase/client";
 
 type ItemNav = {
@@ -213,15 +214,18 @@ export function NavegacaoApp({
                       {item.icone}
                     </svg>
                     <span className="truncate">{item.rotulo}</span>
-                    {badge > 0 && (
-                      <span
-                        className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                          ativo ? "bg-white/25 text-white" : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {badge}
-                      </span>
-                    )}
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                      <IndicadorLink />
+                      {badge > 0 && (
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                            ativo ? "bg-white/25 text-[#ffffff]" : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {badge}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 );
               })}
@@ -247,6 +251,7 @@ export function NavegacaoApp({
             />
           </svg>
           Configurações
+          <IndicadorLink className="ml-auto" />
         </Link>
 
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">

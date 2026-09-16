@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { criarClienteSupabase } from "@/lib/supabase/client";
 import { Logo } from "@/components/marketing/Logo";
 import { avaliarForcaSenha } from "@/lib/senha";
+import { useAntiRobo } from "./CampoAntiRobo";
+import { CHAVE_TURNSTILE, Turnstile } from "./Turnstile";
 
 type Modo = "login" | "cadastro" | "recuperar";
 
@@ -44,6 +46,8 @@ export function FormularioAuth() {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [precisaConfirmar, setPrecisaConfirmar] = useState(false);
+  const [tokenCaptcha, setTokenCaptcha] = useState<string | null>(null);
+  const { verificar: verificarAntiRobo, campo: campoIsca } = useAntiRobo();
 
   const forca = avaliarForcaSenha(senha);
   const emailsDivergem =
@@ -76,6 +80,15 @@ export function FormularioAuth() {
       }
 
       if (modo === "cadastro") {
+        const reprovado = verificarAntiRobo();
+        if (reprovado) {
+          setErro(reprovado);
+          return;
+        }
+        if (CHAVE_TURNSTILE && !tokenCaptcha) {
+          setErro("Conclua a verificação de segurança logo acima.");
+          return;
+        }
         if (email.trim() !== confirmacaoEmail.trim()) {
           setErro("Os e-mails não conferem. Confira os dois campos.");
           return;
@@ -94,6 +107,9 @@ export function FormularioAuth() {
             // e-mail costuma abrir no navegador interno do app de e-mail, onde a
             // sessao criada nao serve pro navegador de verdade do usuario.
             emailRedirectTo: `${window.location.origin}/auth/callback?proximo=/auth/confirmado`,
+            // Validado pelo SERVIDOR do Supabase, não aqui — por isso pular
+            // esta tela não adianta para um robô.
+            ...(tokenCaptcha ? { captchaToken: tokenCaptcha } : {}),
           },
         });
         if (error) throw error;
@@ -112,7 +128,11 @@ export function FormularioAuth() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha,
+        ...(tokenCaptcha ? { options: { captchaToken: tokenCaptcha } } : {}),
+      });
       if (error) {
         // Conta existe mas não confirmou: oferece reenviar em vez de só reclamar.
         if (error.message.includes("Email not confirmed")) setPrecisaConfirmar(true);
@@ -227,7 +247,7 @@ export function FormularioAuth() {
           </>
         )}
 
-        <form onSubmit={aoEnviar} className="space-y-4">
+        <form onSubmit={aoEnviar} className="relative space-y-4">
           {modo === "cadastro" && (
             <div>
               <label className="rotulo" htmlFor="nome">
@@ -392,6 +412,10 @@ export function FormularioAuth() {
               </button>
             </div>
           )}
+
+          {campoIsca}
+
+          {modo === "cadastro" && <Turnstile aoResolver={setTokenCaptcha} />}
 
           <button
             type="submit"

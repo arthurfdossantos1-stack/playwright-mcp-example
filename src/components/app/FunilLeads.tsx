@@ -9,6 +9,7 @@ import {
   removerLead,
 } from "@/app/app/acoes";
 import { SeloPrioridade } from "./SeloPrioridade";
+import { SeloStatus } from "./SeloStatus";
 import { limparUrl, linkWhatsApp, tempoRelativo } from "@/lib/format";
 import {
   LEAD_STATUS_LABEL,
@@ -35,6 +36,8 @@ export type LeadCartao = {
     nota: number | null;
     totalAvaliacoes: number;
     prioridade: PrioridadeRadar;
+    /** Marca a hora em que o wa.me foi aberto pela fila. */
+    contatadoFilaEm: string | null;
   } | null;
 };
 
@@ -137,6 +140,14 @@ export function FunilLeads({
                         </p>
                       )}
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <SeloStatus
+                          sinais={{
+                            lead_id: lead.id,
+                            lead_status: lead.status,
+                            contatado_fila_em: lead.empresa?.contatadoFilaEm ?? null,
+                          }}
+                          curto
+                        />
                         {lead.empresa && <SeloPrioridade prioridade={lead.empresa.prioridade} />}
                         {lead.ultimoContatoEm && (
                           <span className="text-[11px] text-slate-400">

@@ -7,6 +7,7 @@ import {
   FormularioPerfil,
   FormularioSenha,
 } from "@/components/app/FormulariosConta";
+import { Autenticacao2Etapas } from "@/components/app/Autenticacao2Etapas";
 import { formatarData } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Configurações" };
@@ -47,6 +48,8 @@ export default async function PaginaConfiguracoes() {
       </div>
 
       <div className="space-y-5">
+        <Autenticacao2Etapas />
+
         <div className="cartao p-6">
           <h2 className="text-sm font-bold text-slate-900">Identificação</h2>
           <dl className="mt-4 grid gap-4 sm:grid-cols-3">

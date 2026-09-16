@@ -19,7 +19,15 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   // Autenticou, tem acesso completo. Nao existe verificacao de plano.
   if (!user) redirect("/auth?proximo=/app");
 
-  const [{ data: perfil }, { count: pendentes }, { count: filaWhatsapp }] = await Promise.all([
+  // Verificacao em duas etapas: se a conta tem um fator ativo e a sessao ainda
+  // esta em aal1, o codigo do app ainda nao foi digitado. Barrar AQUI e o que
+  // impede alguem de pular a tela de desafio indo direto na URL do painel.
+  const { data: nivel } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (nivel?.nextLevel === "aal2" && nivel.nextLevel !== nivel.currentLevel) {
+    redirect("/auth/verificacao?proximo=/app");
+  }
+
+  const [{ data: perfil }, { count: pendentes }, { data: leadsDaFila }] = await Promise.all([
     supabase.from("profiles").select("nome, email").eq("id", user.id).maybeSingle(),
     supabase
       .from("follow_ups")
@@ -27,13 +35,24 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       .eq("user_id", user.id)
       .in("status", ["pendente", "pronto"])
       .lte("agendado_para", new Date().toISOString()),
+    // Mesmo criterio da /app/enviar-mensagem. Antes o badge contava TODA
+    // empresa com celular valido, entao mostrava um numero que nao batia com
+    // o tamanho real da fila. O filtro final fica em JS, igual ao da pagina.
     supabase
-      .from("empresas")
-      .select("id", { count: "exact", head: true })
+      .from("leads")
+      .select("id, empresas ( whatsapp_e164, contatado_fila_em )")
       .eq("user_id", user.id)
-      .eq("whatsapp_verificado", true)
-      .is("contatado_fila_em", null),
+      .in("status", ["novo", "contatado"])
+      .limit(300),
   ]);
+
+  type EmpresaDaFila = { whatsapp_e164: string | null; contatado_fila_em: string | null };
+  const filaWhatsapp = (
+    (leadsDaFila ?? []) as unknown as { empresas: EmpresaDaFila | EmpresaDaFila[] | null }[]
+  ).filter((lead) => {
+    const empresa = Array.isArray(lead.empresas) ? lead.empresas[0] : lead.empresas;
+    return Boolean(empresa?.whatsapp_e164) && !empresa?.contatado_fila_em;
+  }).length;
 
   const nome =
     perfil?.nome ??
@@ -46,7 +65,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         nome={nome}
         email={perfil?.email ?? user.email ?? ""}
         pendentes={pendentes ?? 0}
-        filaWhatsapp={filaWhatsapp ?? 0}
+        filaWhatsapp={filaWhatsapp}
       />
       <div className="lg:pl-60">
         {/* pb-24 no mobile abre espaço para a barra inferior fixa */}
@@ -56,7 +75,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </main>
       </div>
 
-      <NavInferior pendentes={pendentes ?? 0} filaWhatsapp={filaWhatsapp ?? 0} />
+      <NavInferior pendentes={pendentes ?? 0} filaWhatsapp={filaWhatsapp} />
     </div>
   );
 }

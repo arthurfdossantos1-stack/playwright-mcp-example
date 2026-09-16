@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { SeloStatus } from "@/components/app/SeloStatus";
+import { ORDEM_STATUS, statusDoLead, type StatusLead } from "@/lib/status-lead";
 import type { Metadata } from "next";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { CabecalhoPagina } from "@/components/app/Cabecalho";
 import { PainelFollowUps } from "@/components/app/PainelFollowUps";
 import { BotaoConteudoInicial } from "@/components/app/BotaoConteudoInicial";
 import { formatarDataHora, tempoRelativo } from "@/lib/format";
-import { LEAD_STATUS_LABEL, type LeadStatus } from "@/lib/types";
+import { type LeadStatus } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Visão geral" };
 
@@ -35,7 +37,7 @@ export default async function PaginaVisaoGeral() {
       .limit(6),
     supabase.from("buscas").select("id", { count: "exact", head: true }),
     supabase.from("empresas").select("id", { count: "exact", head: true }),
-    supabase.from("leads").select("id, status"),
+    supabase.from("leads").select("id, status, empresas ( contatado_fila_em )"),
     supabase
       .from("follow_ups")
       .select("id, agendado_para, status, canal, mensagem, leads ( id, empresas ( nome, telefone ) )")
@@ -51,8 +53,16 @@ export default async function PaginaVisaoGeral() {
   const followUps = (followUpsRes.data ?? []) as unknown as FollowUpPainel[];
   const temTemplates = (templatesRes.count ?? 0) > 0;
 
-  const porStatus = leads.reduce<Record<string, number>>((acumulado, lead) => {
-    acumulado[lead.status] = (acumulado[lead.status] ?? 0) + 1;
+  // Mesmo vocabulário das outras telas: o painel conta pelo status DERIVADO
+  // (que separa "no funil" de "mensagem enviada"), não pelo enum cru do banco.
+  const porStatus = leads.reduce<Partial<Record<StatusLead, number>>>((acumulado, lead) => {
+    const empresa = Array.isArray(lead.empresas) ? lead.empresas[0] : lead.empresas;
+    const id = statusDoLead({
+      lead_id: lead.id,
+      lead_status: lead.status as LeadStatus,
+      contatado_fila_em: empresa?.contatado_fila_em ?? null,
+    });
+    acumulado[id] = (acumulado[id] ?? 0) + 1;
     return acumulado;
   }, {});
 
@@ -177,9 +187,9 @@ export default async function PaginaVisaoGeral() {
             Funil
           </h2>
           <div className="cartao divide-y divide-slate-100">
-            {(Object.keys(LEAD_STATUS_LABEL) as LeadStatus[]).map((status) => (
-              <div key={status} className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-slate-600">{LEAD_STATUS_LABEL[status]}</span>
+            {ORDEM_STATUS.filter((status) => status !== "novo").map((status) => (
+              <div key={status} className="flex items-center justify-between gap-3 px-4 py-3">
+                <SeloStatus status={status} />
                 <span className="text-sm font-bold text-slate-900">{porStatus[status] ?? 0}</span>
               </div>
             ))}

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { desfazerContatadoFila, marcarContatadoFila } from "@/app/app/acoes";
 import { SeloPrioridade } from "./SeloPrioridade";
+import { SeloStatus } from "./SeloStatus";
 import { aplicarVariaveis, contextoDaEmpresa } from "@/lib/templates";
 import { linkWaMe } from "@/lib/whatsapp";
-import type { Empresa, Template } from "@/lib/types";
+import type { Empresa, LeadStatus, Template } from "@/lib/types";
 
 export type ItemFila = Pick<
   Empresa,
@@ -24,6 +25,7 @@ export type ItemFila = Pick<
   whatsapp_e164: string;
   /** Lead correspondente no funil — é ele que avança de status. */
   leadId: string;
+  leadStatus: LeadStatus;
   scoreRadar: number;
   nicho: string | null;
   cidade: string | null;
@@ -227,6 +229,9 @@ export function FilaWhatsapp({
             <h2 className="font-titulo text-xl font-bold text-slate-900">{atual.nome}</h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-700">{atual.telefone}</span>
+              <SeloStatus
+                sinais={{ lead_id: atual.leadId, lead_status: atual.leadStatus, contatado_fila_em: null }}
+              />
               <SeloPrioridade prioridade={atual.prioridade} />
             </div>
             {atual.endereco && <p className="mt-1.5 text-sm text-slate-600">{atual.endereco}</p>}
@@ -302,7 +307,10 @@ export function FilaWhatsapp({
                   <p className="truncate text-sm font-medium text-slate-800">{item.nome}</p>
                   <p className="truncate text-xs text-slate-400">{item.telefone}</p>
                 </div>
-                <SeloPrioridade prioridade={item.prioridade} />
+                <SeloStatus
+                  sinais={{ lead_id: item.leadId, lead_status: item.leadStatus, contatado_fila_em: null }}
+                  curto
+                />
               </li>
             ))}
             {fila.length > 8 && (

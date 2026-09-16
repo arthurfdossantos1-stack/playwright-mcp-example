@@ -23,6 +23,7 @@ type LinhaLead = {
     nota: number | null;
     total_avaliacoes: number;
     prioridade: PrioridadeRadar;
+  contatado_fila_em: string | null;
   } | null;
 };
 
@@ -37,7 +38,7 @@ export default async function PaginaLeads({
   let consulta = supabase
     .from("leads")
     .select(
-      "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade )",
+      "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade, contatado_fila_em )",
     )
     .order("posicao", { ascending: true })
     .order("criado_em", { ascending: false });
@@ -67,6 +68,7 @@ export default async function PaginaLeads({
             website: empresa.website,
             instagram: empresa.instagram,
             nota: empresa.nota,
+            contatadoFilaEm: empresa.contatado_fila_em ?? null,
             totalAvaliacoes: empresa.total_avaliacoes,
             prioridade: empresa.prioridade,
           }

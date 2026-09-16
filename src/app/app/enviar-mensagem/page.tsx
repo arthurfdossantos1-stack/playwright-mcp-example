@@ -67,6 +67,7 @@ export default async function PaginaEnviarMensagem() {
     itens.push({
       id: empresa.id,
       leadId: linha.id,
+      leadStatus: linha.status,
       nome: empresa.nome,
       endereco: empresa.endereco,
       telefone: empresa.telefone,

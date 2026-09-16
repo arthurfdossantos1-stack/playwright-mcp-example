@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { IndicadorLink } from "./IndicadorLink";
 import { usePathname } from "next/navigation";
 
 /**
@@ -100,6 +101,8 @@ export function NavInferior({
                   {contagem > 9 ? "9+" : contagem}
                 </span>
               )}
+              {/* Feedback do toque: cobre o ícone até a tela trocar. */}
+              <IndicadorLink cobrindo />
             </span>
             {item.rotulo}
           </Link>
