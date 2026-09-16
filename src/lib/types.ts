@@ -69,6 +69,7 @@ export type Busca = {
   projeto_id: string | null;
   nicho: string;
   cidade: string;
+  pais: string;
   termo: string;
   status: BuscaStatus;
   total_resultados: number;

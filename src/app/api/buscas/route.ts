@@ -5,6 +5,7 @@ import { buscarEmpresas, detalharEmpresas, montarTermo, ErroPlaces } from "@/lib
 import { descobrirInstagramEmLote } from "@/lib/instagram";
 import { avaliarRadar } from "@/lib/radar";
 import { validarWhatsapp } from "@/lib/whatsapp";
+import { PAISES, PAIS_PADRAO } from "@/lib/paises";
 import {
   chaveRateLimit,
   checarNoBanco,
@@ -19,6 +20,11 @@ export const maxDuration = 60;
 const Entrada = z.object({
   nicho: z.string().trim().min(2, "Informe o nicho.").max(120),
   cidade: z.string().trim().min(2, "Informe a cidade.").max(120),
+  pais: z
+    .string()
+    .trim()
+    .refine((c) => PAISES.some((p) => p.codigo === c), "País não suportado.")
+    .default(PAIS_PADRAO),
   projetoId: z.string().uuid().nullable().optional(),
 });
 
@@ -48,7 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { nicho, cidade, projetoId } = analise.data;
+  const { nicho, cidade, pais, projetoId } = analise.data;
 
   // Protecao tecnica de infraestrutura — nao e limite de plano.
   const limite = await checarNoBanco(
@@ -74,7 +80,8 @@ export async function POST(request: Request) {
       projeto_id: projetoId ?? null,
       nicho,
       cidade,
-      termo: montarTermo(nicho, cidade),
+      pais,
+      termo: montarTermo(nicho, cidade, pais),
       status: "processando",
     })
     .select("id")
@@ -89,7 +96,7 @@ export async function POST(request: Request) {
 
   try {
     // 1. Text Search — todas as paginas que o Google devolver.
-    const resumos = await buscarEmpresas(nicho, cidade);
+    const resumos = await buscarEmpresas(nicho, cidade, { pais });
 
     if (resumos.length === 0) {
       await supabase
@@ -100,7 +107,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Place Details — telefone, site, avaliacoes e endereco.
-    const detalhados = await detalharEmpresas(resumos, { concorrencia: 6 });
+    const detalhados = await detalharEmpresas(resumos, { concorrencia: 6, pais });
 
     // 3. Instagram a partir do site da empresa.
     const instagrams = await descobrirInstagramEmLote(
@@ -119,7 +126,7 @@ export async function POST(request: Request) {
         telefone: empresa.telefone,
       });
 
-      const whatsapp = validarWhatsapp(empresa.telefone);
+      const whatsapp = validarWhatsapp(empresa.telefone, pais);
 
       return {
         user_id: user.id,

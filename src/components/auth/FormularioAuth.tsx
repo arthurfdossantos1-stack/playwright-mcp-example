@@ -43,6 +43,7 @@ export function FormularioAuth() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [precisaConfirmar, setPrecisaConfirmar] = useState(false);
 
   const forca = avaliarForcaSenha(senha);
   const emailsDivergem =
@@ -104,6 +105,7 @@ export function FormularioAuth() {
           return;
         }
 
+        setPrecisaConfirmar(true);
         setAviso(
           "Conta criada! Confirme seu e-mail pelo link que acabamos de enviar para liberar o acesso.",
         );
@@ -111,7 +113,11 @@ export function FormularioAuth() {
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-      if (error) throw error;
+      if (error) {
+        // Conta existe mas não confirmou: oferece reenviar em vez de só reclamar.
+        if (error.message.includes("Email not confirmed")) setPrecisaConfirmar(true);
+        throw error;
+      }
       router.push(proximo);
       router.refresh();
     } catch (e) {
@@ -119,6 +125,40 @@ export function FormularioAuth() {
     } finally {
       setCarregando(false);
     }
+  }
+
+  /**
+   * Reenvia o e-mail de confirmação.
+   *
+   * O serviço de e-mail embutido do Supabase entrega "best-effort" e tem um
+   * teto baixo por hora, então o link some com frequência. Quando o reenvio
+   * também bate no limite, a mensagem diz o que fazer em vez de falhar seco.
+   */
+  async function reenviarConfirmacao() {
+    if (!email) {
+      setErro("Informe o e-mail para reenviarmos a confirmação.");
+      return;
+    }
+
+    setCarregando(true);
+    setErro(null);
+    setAviso(null);
+
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?proximo=/auth/confirmado`,
+      },
+    });
+
+    setCarregando(false);
+
+    if (error) {
+      setErro(traduzirErro(error));
+      return;
+    }
+    setAviso("Reenviamos o link. Confira a caixa de entrada e também o spam.");
   }
 
   async function entrarComGoogle() {
@@ -337,6 +377,22 @@ export function FormularioAuth() {
             </p>
           )}
 
+          {precisaConfirmar && (
+            <div className="anim-entrada rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <p className="text-sm leading-relaxed text-amber-900">
+                Não recebeu o link? O envio pode demorar ou cair no spam.
+              </p>
+              <button
+                type="button"
+                onClick={reenviarConfirmacao}
+                disabled={carregando}
+                className="mt-2 text-sm font-bold text-amber-900 underline underline-offset-2 disabled:opacity-60"
+              >
+                {carregando ? "Reenviando…" : "Reenviar e-mail de confirmação"}
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={carregando || emailsDivergem || senhasDivergem}
@@ -422,10 +478,15 @@ function traduzirErro(erro: unknown): string {
     "Unable to validate email address: invalid format": "E-mail em formato inválido.",
     "For security purposes, you can only request this after 60 seconds.":
       "Aguarde um minuto antes de tentar novamente.",
+    // Teto de e-mails do servidor: a causa real de "o link nunca chega".
+    "email rate limit exceeded":
+      "O servidor de e-mail atingiu o limite desta hora. Aguarde e tente de novo, ou peça para desativar a confirmação por e-mail nas configurações.",
+    "over_email_send_rate_limit":
+      "O servidor de e-mail atingiu o limite desta hora. Aguarde e tente de novo, ou peça para desativar a confirmação por e-mail nas configurações.",
   };
 
   for (const [chave, traducao] of Object.entries(mapa)) {
-    if (mensagem.includes(chave)) return traducao;
+    if (mensagem.toLowerCase().includes(chave.toLowerCase())) return traducao;
   }
 
   if (mensagem.toLowerCase().includes("fetch")) {

@@ -72,6 +72,9 @@ create table if not exists public.buscas (
   projeto_id      uuid references public.projetos (id) on delete set null,
   nicho           text not null,
   cidade          text not null,
+  -- ISO 3166-1 alpha-2: define regionCode/languageCode da Places API e a
+  -- regra de celular que a fila de WhatsApp aplica.
+  pais            text not null default 'BR',
   termo           text not null,
   status          busca_status not null default 'processando',
   total_resultados integer not null default 0,

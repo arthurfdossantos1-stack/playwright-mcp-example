@@ -11,6 +11,8 @@
  * nao entrar em loop caso a API mude de comportamento.
  */
 
+import { acharPais } from "@/lib/paises";
+
 const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 const DETAILS_URL = "https://places.googleapis.com/v1/places";
 
@@ -116,9 +118,14 @@ function normalizarResumo(place: ApiPlace): PlaceResumo | null {
   };
 }
 
+/** Conector "nicho <em> cidade" no idioma do país buscado. */
+const CONECTOR: Record<string, string> = { pt: "em", es: "en", en: "in" };
+
 /** Monta o termo de busca a partir do nicho e da cidade. */
-export function montarTermo(nicho: string, cidade: string): string {
-  return `${nicho.trim()} em ${cidade.trim()}`;
+export function montarTermo(nicho: string, cidade: string, codigoPais?: string): string {
+  const idioma = acharPais(codigoPais).idioma.split("-")[0];
+  const conector = CONECTOR[idioma] ?? "in";
+  return `${nicho.trim()} ${conector} ${cidade.trim()}`;
 }
 
 /**
@@ -128,10 +135,11 @@ export function montarTermo(nicho: string, cidade: string): string {
 export async function buscarEmpresas(
   nicho: string,
   cidade: string,
-  opcoes: { sinal?: AbortSignal } = {},
+  opcoes: { sinal?: AbortSignal; pais?: string } = {},
 ): Promise<PlaceResumo[]> {
+  const pais = acharPais(opcoes.pais);
   const chave = chaveApi();
-  const termo = montarTermo(nicho, cidade);
+  const termo = montarTermo(nicho, cidade, opcoes.pais);
 
   const encontrados: PlaceResumo[] = [];
   const vistos = new Set<string>();
@@ -140,8 +148,8 @@ export async function buscarEmpresas(
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
     const corpo: Record<string, unknown> = {
       textQuery: termo,
-      languageCode: "pt-BR",
-      regionCode: "BR",
+      languageCode: pais.idioma,
+      regionCode: pais.codigo,
       pageSize: 20,
     };
     if (pageToken) corpo.pageToken = pageToken;
@@ -189,7 +197,7 @@ export async function buscarEmpresas(
 /** Place Details de um unico place_id. */
 export async function detalharEmpresa(
   placeId: string,
-  opcoes: { sinal?: AbortSignal } = {},
+  opcoes: { sinal?: AbortSignal; pais?: string } = {},
 ): Promise<PlaceDetalhado | null> {
   const chave = chaveApi();
 
@@ -197,7 +205,7 @@ export async function detalharEmpresa(
     headers: {
       "X-Goog-Api-Key": chave,
       "X-Goog-FieldMask": DETAILS_FIELD_MASK,
-      "Accept-Language": "pt-BR",
+      "Accept-Language": acharPais(opcoes.pais).idioma,
     },
     signal: opcoes.sinal,
     cache: "no-store",
@@ -223,7 +231,7 @@ export async function detalharEmpresa(
  */
 export async function detalharEmpresas(
   resumos: PlaceResumo[],
-  opcoes: { concorrencia?: number; sinal?: AbortSignal } = {},
+  opcoes: { concorrencia?: number; sinal?: AbortSignal; pais?: string } = {},
 ): Promise<PlaceDetalhado[]> {
   const concorrencia = Math.max(1, opcoes.concorrencia ?? 6);
   const saida: PlaceDetalhado[] = new Array(resumos.length);
@@ -234,7 +242,10 @@ export async function detalharEmpresas(
       const indice = cursor++;
       const resumo = resumos[indice];
       try {
-        const detalhe = await detalharEmpresa(resumo.placeId, { sinal: opcoes.sinal });
+        const detalhe = await detalharEmpresa(resumo.placeId, {
+          sinal: opcoes.sinal,
+          pais: opcoes.pais,
+        });
         saida[indice] = detalhe ?? { ...resumo, telefone: null, website: null, totalFotos: 0 };
       } catch {
         saida[indice] = { ...resumo, telefone: null, website: null, totalFotos: 0 };
