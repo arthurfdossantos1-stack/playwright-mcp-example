@@ -14,10 +14,16 @@ import type { NextConfig } from "next";
  * nonce obriga toda pagina a virar dinamica, matando o build estatico da
  * landing. A troca foi consciente.
  */
+const ehDesenvolvimento = process.env.NODE_ENV === "development";
+
 const CSP = [
   "default-src 'self'",
   // challenges.cloudflare.com: widget do Turnstile (CAPTCHA do cadastro).
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+  // 'unsafe-eval' SO em desenvolvimento: o hot reload do Next avalia string
+  // como codigo e, sem isso, o `next dev` quebra por completo (a pagina nem
+  // hidrata e nenhum clique funciona). O build de producao nao usa eval, e
+  // foi conferido no navegador com `next start` — nenhum erro de CSP.
+  `script-src 'self' 'unsafe-inline'${ehDesenvolvimento ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",

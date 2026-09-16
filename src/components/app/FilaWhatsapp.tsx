@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { desfazerContatadoFila, marcarContatadoFila } from "@/app/app/acoes";
+import { adicionarLead, desfazerContatadoFila, marcarContatadoFila, removerLead } from "@/app/app/acoes";
 import { SeloPrioridade } from "./SeloPrioridade";
 import { SeloStatus } from "./SeloStatus";
 import { aplicarVariaveis, contextoDaEmpresa } from "@/lib/templates";
@@ -32,7 +32,12 @@ export type ItemFila = Pick<
 };
 
 /** Item removido da fila que ainda dá para trazer de volta. */
-type Desfazivel = { item: ItemFila; posicao: number };
+type Desfazivel = {
+  item: ItemFila;
+  posicao: number;
+  /** "enviado" volta a marcação de contato; "descartado" recria o lead. */
+  tipo: "enviado" | "descartado";
+};
 
 const SEGUNDOS_PARA_DESFAZER = 8;
 
@@ -52,6 +57,7 @@ export function FilaWhatsapp({
   const [desfazivel, setDesfazivel] = useState<Desfazivel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviados, setEnviados] = useState(0);
+  const [verTodos, setVerTodos] = useState(false);
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const template = templates.find((t) => t.id === templateId) ?? null;
@@ -104,7 +110,7 @@ export function FilaWhatsapp({
     const item = atual;
     setFila((lista) => lista.filter((e) => e.id !== item.id));
     setEnviados((n) => n + 1);
-    setDesfazivel({ item, posicao: 0 });
+    setDesfazivel({ item, posicao: 0, tipo: "enviado" });
     agendarLimpezaDoDesfazer();
 
     void marcarContatadoFila(item.id, item.leadId).then((resposta) => {
@@ -112,7 +118,7 @@ export function FilaWhatsapp({
         setErro(resposta.erro ?? "Não foi possível marcar como contatado.");
         setEnviados((n) => Math.max(0, n - 1));
         setDesfazivel((atual) => (atual?.item.id === item.id ? null : atual));
-        repor({ item, posicao: 0 });
+        repor({ item, posicao: 0, tipo: "enviado" });
       }
     });
   }
@@ -124,14 +130,57 @@ export function FilaWhatsapp({
     setFila((lista) => [...lista.slice(1), lista[0]]);
   }
 
+  /**
+   * Descarta o lead: sai da fila E do funil.
+   *
+   * Como a fila É o funil, remover daqui tem de remover de lá — senão o lead
+   * sumiria da tela mas voltaria no próximo carregamento. A empresa continua
+   * nos resultados da varredura, então dá para mandar de novo pro funil
+   * depois se mudar de ideia.
+   */
+  function descartar(alvo: ItemFila) {
+    setErro(null);
+    const posicao = fila.findIndex((e) => e.id === alvo.id);
+    setFila((lista) => lista.filter((e) => e.id !== alvo.id));
+    setDesfazivel({ item: alvo, posicao: Math.max(0, posicao), tipo: "descartado" });
+    agendarLimpezaDoDesfazer();
+
+    void removerLead(alvo.leadId).then((resposta) => {
+      if (!resposta.ok) {
+        setErro(resposta.erro ?? "Não foi possível descartar esse lead.");
+        setDesfazivel((atual) => (atual?.item.id === alvo.id ? null : atual));
+        repor({ item: alvo, posicao: Math.max(0, posicao), tipo: "descartado" });
+      }
+    });
+  }
+
   function desfazer() {
     const alvo = desfazivel;
     if (!alvo) return;
     setDesfazivel(null);
-    setEnviados((n) => Math.max(0, n - 1));
     repor(alvo);
-    void desfazerContatadoFila(alvo.item.id, alvo.item.leadId).then((resposta) => {
-      if (!resposta.ok) setErro(resposta.erro ?? "Não foi possível desfazer.");
+
+    if (alvo.tipo === "enviado") {
+      setEnviados((n) => Math.max(0, n - 1));
+      void desfazerContatadoFila(alvo.item.id, alvo.item.leadId).then((resposta) => {
+        if (!resposta.ok) setErro(resposta.erro ?? "Não foi possível desfazer.");
+      });
+      return;
+    }
+
+    // O lead foi apagado do funil: desfazer significa criá-lo de novo. Ele
+    // volta com outro id, então a lista precisa do id novo para o próximo
+    // envio funcionar.
+    void adicionarLead(alvo.item.id).then((resposta) => {
+      if (!resposta.ok || !resposta.id) {
+        setErro(resposta.erro ?? "Não foi possível trazer o lead de volta.");
+        setFila((lista) => lista.filter((e) => e.id !== alvo.item.id));
+        return;
+      }
+      const novoId = resposta.id;
+      setFila((lista) =>
+        lista.map((e) => (e.id === alvo.item.id ? { ...e, leadId: novoId, leadStatus: "novo" } : e)),
+      );
     });
   }
 
@@ -200,12 +249,16 @@ export function FilaWhatsapp({
 
         {desfazivel && (
           <div
-            className="anim-entrada mb-4 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800"
+            className={`anim-entrada mb-4 flex items-center justify-between gap-3 rounded-lg px-3.5 py-2.5 text-sm ${
+              desfazivel.tipo === "enviado"
+                ? "bg-emerald-50 text-emerald-800"
+                : "bg-slate-100 text-slate-700"
+            }`}
             role="status"
           >
             <span className="min-w-0 truncate">
-              <strong className="font-semibold">{desfazivel.item.nome}</strong> marcado como
-              contatado.
+              <strong className="font-semibold">{desfazivel.item.nome}</strong>{" "}
+              {desfazivel.tipo === "enviado" ? "marcado como contatado." : "saiu da fila e do funil."}
             </span>
             <button type="button" onClick={desfazer} className="shrink-0 font-semibold underline">
               Desfazer
@@ -259,15 +312,24 @@ export function FilaWhatsapp({
               {!template ? "Crie um template para começar" : "Abrir WhatsApp e avançar"}
             </button>
 
-            {fila.length > 1 && (
+            <div className="mt-2 flex gap-2">
+              {fila.length > 1 && (
+                <button
+                  type="button"
+                  onClick={pular}
+                  className="flex-1 rounded-lg py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                >
+                  Pular — volta pro fim
+                </button>
+              )}
               <button
                 type="button"
-                onClick={pular}
-                className="mt-2 w-full rounded-lg py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                onClick={() => descartar(atual)}
+                className="flex-1 rounded-lg py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
               >
-                Pular por agora — volta pro fim da fila
+                Descartar — tira do funil
               </button>
-            )}
+            </div>
 
             <p className="mt-2.5 text-center text-[11.5px] leading-relaxed text-slate-500">
               Você envia com a mão. A fila já pula pro próximo no clique.
@@ -298,8 +360,8 @@ export function FilaWhatsapp({
           <p className="py-3 text-sm text-slate-500">Esse é o último da fila.</p>
         ) : (
           <ul className="lista-filetes">
-            {fila.slice(1, 8).map((item, indice) => (
-              <li key={item.id} className="flex items-center gap-3 py-2.5">
+            {fila.slice(1, verTodos ? undefined : 8).map((item, indice) => (
+              <li key={item.id} className="flex items-center gap-2.5 py-2.5">
                 <span className="w-4 shrink-0 font-titulo text-xs font-extrabold text-slate-300">
                   {indice + 2}
                 </span>
@@ -311,10 +373,31 @@ export function FilaWhatsapp({
                   sinais={{ lead_id: item.leadId, lead_status: item.leadStatus, contatado_fila_em: null }}
                   curto
                 />
+                {/* Descarte direto da lista: dá para limpar a fila sem ter de
+                    passar lead por lead até chegar no que você não quer. */}
+                <button
+                  type="button"
+                  onClick={() => descartar(item)}
+                  aria-label={`Descartar ${item.nome}`}
+                  title="Descartar — tira da fila e do funil"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-600"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                  </svg>
+                </button>
               </li>
             ))}
             {fila.length > 8 && (
-              <li className="py-2.5 text-center text-xs text-slate-400">+{fila.length - 8} na fila</li>
+              <li className="py-2.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => setVerTodos((v) => !v)}
+                  className="text-xs font-semibold text-marca-700 hover:underline"
+                >
+                  {verTodos ? "Mostrar só os próximos 7" : `Ver todos os ${fila.length - 1} da fila`}
+                </button>
+              </li>
             )}
           </ul>
         )}
