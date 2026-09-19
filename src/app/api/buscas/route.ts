@@ -228,7 +228,18 @@ export async function POST(request: Request) {
     if (resumos.length === 0) return [];
 
     // 2. Place Details — telefone, site, avaliacoes e endereco.
-    const detalhados = await detalharEmpresas(resumos, { concorrencia: 6, pais });
+    const { itens: detalhados, falhas } = await detalharEmpresas(resumos, {
+      concorrencia: 6,
+      pais,
+    });
+
+    // Antes essa falha era silenciosa e a empresa entrava no funil sem
+    // telefone, como se o negocio e que nao tivesse numero. Agora ela aparece.
+    if (falhas > 0) {
+      avisos.push(
+        `${falhas} de ${resumos.length} empresas ficaram sem telefone e site: o Google recusou os detalhes (cota). Rode a varredura de novo daqui a pouco para completar.`,
+      );
+    }
 
     // 3. Instagram a partir do site da empresa.
     const instagrams = await descobrirInstagramEmLote(

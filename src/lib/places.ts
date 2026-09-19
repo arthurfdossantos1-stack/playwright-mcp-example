@@ -194,60 +194,105 @@ export async function buscarEmpresas(
   return encontrados;
 }
 
-/** Place Details de um unico place_id. */
+const TENTATIVAS_DETALHE = 3;
+
+function dormir(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Place Details de um unico place_id.
+ *
+ * Tenta de novo em 429 (cota por segundo) e em erro 5xx. Sem isso, uma
+ * rajada de rate limit fazia a varredura inteira gravar empresas sem
+ * telefone, sem site e sem fotos — e como o codigo engolia a falha em
+ * silencio, o resultado parecia "esses negocios nao tem telefone" em vez de
+ * "a consulta falhou". Foi assim que centenas de leads entraram no funil sem
+ * numero de WhatsApp.
+ */
 export async function detalharEmpresa(
   placeId: string,
   opcoes: { sinal?: AbortSignal; pais?: string } = {},
 ): Promise<PlaceDetalhado | null> {
   const chave = chaveApi();
 
-  const resposta = await fetch(`${DETAILS_URL}/${encodeURIComponent(placeId)}`, {
-    headers: {
-      "X-Goog-Api-Key": chave,
-      "X-Goog-FieldMask": DETAILS_FIELD_MASK,
-      "Accept-Language": acharPais(opcoes.pais).idioma,
-    },
-    signal: opcoes.sinal,
-    cache: "no-store",
-  });
+  for (let tentativa = 0; tentativa < TENTATIVAS_DETALHE; tentativa++) {
+    const resposta = await fetch(`${DETAILS_URL}/${encodeURIComponent(placeId)}`, {
+      headers: {
+        "X-Goog-Api-Key": chave,
+        "X-Goog-FieldMask": DETAILS_FIELD_MASK,
+        "Accept-Language": acharPais(opcoes.pais).idioma,
+      },
+      signal: opcoes.sinal,
+      cache: "no-store",
+    });
 
-  if (!resposta.ok) return null;
+    if (resposta.ok) {
+      const place = (await resposta.json()) as ApiPlace;
+      const resumo = normalizarResumo(place);
+      if (!resumo) return null;
 
-  const place = (await resposta.json()) as ApiPlace;
-  const resumo = normalizarResumo(place);
-  if (!resumo) return null;
+      return {
+        ...resumo,
+        telefone: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
+        website: place.websiteUri ?? null,
+        totalFotos: Array.isArray(place.photos) ? place.photos.length : 0,
+      };
+    }
 
-  return {
-    ...resumo,
-    telefone: place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null,
-    website: place.websiteUri ?? null,
-    totalFotos: Array.isArray(place.photos) ? place.photos.length : 0,
-  };
+    // 404/403 nao melhoram com repeticao; so faz sentido insistir em rajada
+    // de cota (429) e em erro do lado do Google (5xx).
+    const valeRepetir = resposta.status === 429 || resposta.status >= 500;
+    if (!valeRepetir || tentativa === TENTATIVAS_DETALHE - 1) return null;
+
+    await dormir(400 * 2 ** tentativa);
+  }
+
+  return null;
 }
+
+export type ResultadoDetalhes = {
+  itens: PlaceDetalhado[];
+  /** Quantas empresas ficaram sem detalhes (telefone, site, fotos). */
+  falhas: number;
+};
 
 /**
  * Detalha varias empresas com concorrencia limitada (protege a cota do Google
  * e evita rajadas, sem restringir a quantidade de resultados da varredura).
+ *
+ * Devolve a CONTAGEM de falhas junto: a empresa ainda entra na lista com os
+ * campos vazios (o nome e o endereco do Text Search valem alguma coisa), mas
+ * agora quem chamou sabe que faltou dado e pode avisar a pessoa, em vez de
+ * fazer parecer que a empresa e que nao tem telefone.
  */
 export async function detalharEmpresas(
   resumos: PlaceResumo[],
   opcoes: { concorrencia?: number; sinal?: AbortSignal; pais?: string } = {},
-): Promise<PlaceDetalhado[]> {
+): Promise<ResultadoDetalhes> {
   const concorrencia = Math.max(1, opcoes.concorrencia ?? 6);
   const saida: PlaceDetalhado[] = new Array(resumos.length);
   let cursor = 0;
+  let falhas = 0;
 
   async function trabalhador() {
     while (cursor < resumos.length) {
       const indice = cursor++;
       const resumo = resumos[indice];
+      let detalhe: PlaceDetalhado | null = null;
       try {
-        const detalhe = await detalharEmpresa(resumo.placeId, {
+        detalhe = await detalharEmpresa(resumo.placeId, {
           sinal: opcoes.sinal,
           pais: opcoes.pais,
         });
-        saida[indice] = detalhe ?? { ...resumo, telefone: null, website: null, totalFotos: 0 };
       } catch {
+        detalhe = null;
+      }
+
+      if (detalhe) {
+        saida[indice] = detalhe;
+      } else {
+        falhas += 1;
         saida[indice] = { ...resumo, telefone: null, website: null, totalFotos: 0 };
       }
     }
@@ -257,5 +302,5 @@ export async function detalharEmpresas(
     Array.from({ length: Math.min(concorrencia, resumos.length) }, () => trabalhador()),
   );
 
-  return saida.filter(Boolean);
+  return { itens: saida.filter(Boolean), falhas };
 }

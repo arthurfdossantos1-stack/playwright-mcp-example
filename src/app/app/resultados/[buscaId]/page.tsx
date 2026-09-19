@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { CabecalhoPagina } from "@/components/app/Cabecalho";
 import { ListaResultados } from "@/components/app/ListaResultados";
+import { AvisosDaBusca } from "@/components/app/AvisosDaBusca";
 import { formatarDataHora } from "@/lib/format";
 import type { EmpresaRadar } from "@/lib/types";
 
@@ -60,6 +61,8 @@ export default async function PaginaResultados({
           {busca.erro ?? "Tente novamente em instantes."}
         </div>
       )}
+
+      <AvisosDaBusca />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[

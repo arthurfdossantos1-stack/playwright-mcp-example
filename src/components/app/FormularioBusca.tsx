@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Projeto } from "@/lib/types";
 import { PAISES, PAIS_PADRAO, acharPais } from "@/lib/paises";
 import type { FonteBusca } from "@/lib/types";
+import { CHAVE_AVISOS } from "./AvisosDaBusca";
 
 const FONTES: { id: FonteBusca; rotulo: string; explica: string }[] = [
   { id: "google", rotulo: "Google", explica: "Empresas no Google Maps: telefone, endereço e avaliações." },
@@ -57,7 +58,7 @@ export function FormularioBusca({
       // (tipicamente a cota do Instagram). Fica guardado pra tela de resultado.
       if (dados.avisos?.length) {
         try {
-          sessionStorage.setItem("rastrolead:avisos-busca", JSON.stringify(dados.avisos));
+          sessionStorage.setItem(CHAVE_AVISOS, JSON.stringify(dados.avisos));
         } catch {
           /* sem storage o aviso so se perde */
         }
