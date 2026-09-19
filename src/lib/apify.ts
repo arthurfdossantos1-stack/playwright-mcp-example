@@ -21,8 +21,22 @@
 
 const BASE = "https://api.apify.com/v2";
 
-/** Busca perfis pela busca publica do Instagram (user / hashtag / place). */
-const ATOR_BUSCA = "apify~instagram-search-scraper";
+/**
+ * Ator que faz a busca publica do Instagram (user / hashtag / place).
+ *
+ * Configuravel de proposito. Os atores da Apify Store mudam de nome, de dono
+ * e de schema sem aviso, e nao da pra validar o id daqui. Se o padrao parar
+ * de existir, e so trocar APIFY_ATOR_BUSCA no painel — sem mexer no codigo.
+ * Formato do id na API: "dono~nome" (o ~ substitui a barra).
+ */
+const ATOR_PADRAO = "apify~instagram-search-scraper";
+
+function atorBusca(): string {
+  const escolhido = process.env.APIFY_ATOR_BUSCA?.trim();
+  if (!escolhido) return ATOR_PADRAO;
+  // Aceita "dono/nome" colado direto da URL da Store.
+  return escolhido.replace("/", "~");
+}
 
 /** Runs sincronos do Apify cortam em 300s; damos folga abaixo disso. */
 const TIMEOUT_MS = 240_000;
@@ -178,6 +192,12 @@ async function rodarAtor(
           402,
         );
       }
+      if (resposta.status === 404) {
+        throw new ErroApify(
+          `O ator "${ator.replace("~", "/")}" não existe na sua conta do Apify. Abra a Apify Store, escolha um scraper de busca do Instagram e coloque o id dele (dono/nome) em APIFY_ATOR_BUSCA.`,
+          400,
+        );
+      }
       throw new ErroApify(`Apify respondeu ${resposta.status}: ${corpo.slice(0, 200)}`, 502);
     }
 
@@ -211,7 +231,7 @@ export async function buscarPerfis(
   const termo = `${nicho.trim()} ${cidade.trim()}`.trim();
 
   const itens = await rodarAtor(
-    ATOR_BUSCA,
+    atorBusca(),
     {
       search: termo,
       searchType: "user",
