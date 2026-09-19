@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { buscarEmpresas, detalharEmpresas, montarTermo, ErroPlaces } from "@/lib/places";
+import {
+  buscarEmpresas,
+  buscarEmpresasNoPais,
+  detalharEmpresas,
+  montarTermo,
+  ErroPlaces,
+} from "@/lib/places";
 import { descobrirInstagramEmLote } from "@/lib/instagram";
 import { avaliarRadar, avaliarRadarInstagram } from "@/lib/radar";
 import { validarWhatsapp } from "@/lib/whatsapp";
-import { PAISES, PAIS_PADRAO } from "@/lib/paises";
+import { acharPais, PAISES, PAIS_PADRAO } from "@/lib/paises";
 import {
   apifyConfigurado,
   buscarPerfis,
@@ -25,17 +31,28 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const Entrada = z.object({
-  nicho: z.string().trim().min(2, "Informe o nicho.").max(120),
-  cidade: z.string().trim().min(2, "Informe a cidade.").max(120),
-  pais: z
-    .string()
-    .trim()
-    .refine((c) => PAISES.some((p) => p.codigo === c), "País não suportado.")
-    .default(PAIS_PADRAO),
-  fonte: z.enum(["google", "instagram", "ambos"]).default("google"),
-  projetoId: z.string().uuid().nullable().optional(),
-});
+const Entrada = z
+  .object({
+    nicho: z.string().trim().min(2, "Informe o nicho.").max(120),
+    cidade: z.string().trim().max(120).optional().default(""),
+    pais: z
+      .string()
+      .trim()
+      .refine((c) => PAISES.some((p) => p.codigo === c), "País não suportado.")
+      .default(PAIS_PADRAO),
+    fonte: z.enum(["google", "instagram", "ambos"]).default("google"),
+    /** "pais" varre as maiores praças do país em vez de uma cidade só. */
+    abrangencia: z.enum(["cidade", "pais"]).default("cidade"),
+    /** Quantas empresas trazer. Também define até onde varrer no modo país. */
+    alvo: z.coerce.number().int().min(5).max(120).default(60),
+    /** Só quem não tem site — o lead de quem vende presença digital. */
+    somenteSemSite: z.boolean().default(false),
+    projetoId: z.string().uuid().nullable().optional(),
+  })
+  .refine((d) => d.abrangencia === "pais" || d.cidade.length >= 2, {
+    message: "Informe a cidade.",
+    path: ["cidade"],
+  });
 
 /** Linha pronta pra gravar em `empresas`, montada por qualquer uma das fontes. */
 type LinhaEmpresa = Record<string, unknown> & { place_id: string };
@@ -88,7 +105,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const { nicho, cidade, pais, fonte, projetoId } = analise.data;
+  const { nicho, pais, fonte, abrangencia, alvo, somenteSemSite, projetoId } = analise.data;
+  const noPaisTodo = abrangencia === "pais";
+  // `cidade` e NOT NULL no banco e aparece na interface; no modo país o nome
+  // do país cumpre esse papel ("imobiliária · Brasil").
+  const cidade = noPaisTodo ? acharPais(pais).nome : analise.data.cidade;
   const querInstagram = fonte === "instagram" || fonte === "ambos";
 
   if (querInstagram && !apifyConfigurado()) {
@@ -223,8 +244,14 @@ export async function POST(request: Request) {
   // ------------------------------------------------------------------ fontes
 
   async function coletarDoGoogle(): Promise<LinhaEmpresa[]> {
-    // 1. Text Search — todas as paginas que o Google devolver.
-    const resumos = await buscarEmpresas(nicho, cidade, { pais });
+    // Filtrar "sem site" depois do Place Details descarta boa parte do que
+    // veio, entao buscamos com folga pra ter chance de fechar o alvo.
+    const folga = somenteSemSite ? 3 : 1;
+
+    // 1. Text Search — uma cidade, ou as maiores praças do país.
+    const resumos = noPaisTodo
+      ? await buscarEmpresasNoPais(nicho, { pais, alvo: alvo * folga })
+      : (await buscarEmpresas(nicho, cidade, { pais })).slice(0, alvo * folga);
     if (resumos.length === 0) return [];
 
     // 2. Place Details — telefone, site, avaliacoes e endereco.
@@ -248,7 +275,7 @@ export async function POST(request: Request) {
     );
 
     // 4. Radar de Oportunidades.
-    return detalhados.map((empresa, indice) => {
+    const linhasGoogle = detalhados.map((empresa, indice) => {
       const instagram = instagrams[indice];
       const radar = avaliarRadar({
         website: empresa.website,
@@ -281,12 +308,30 @@ export async function POST(request: Request) {
         whatsapp_e164: whatsapp.e164,
         whatsapp_verificado: whatsapp.verificado,
         fotos_total: empresa.totalFotos,
+        semSite: !empresa.website,
       };
+    });
+
+    const filtradas = somenteSemSite ? linhasGoogle.filter((l) => l.semSite) : linhasGoogle;
+
+    if (somenteSemSite && filtradas.length < alvo) {
+      avisos.push(
+        `Você pediu ${alvo} sem site e o Google tinha ${filtradas.length} nesse recorte. Tente outra cidade, um subnicho ou o Brasil inteiro.`,
+      );
+    }
+
+    // `semSite` era só para filtrar aqui; não existe como coluna no banco.
+    return filtradas.slice(0, alvo).map((linha) => {
+      const copia = { ...linha } as Partial<typeof linha>;
+      delete copia.semSite;
+      return copia as LinhaEmpresa;
     });
   }
 
   async function coletarDoInstagram(teto: number): Promise<LinhaEmpresa[]> {
-    const perfis = await buscarPerfis(nicho, cidade, { limite: teto });
+    const brutos = await buscarPerfis(nicho, cidade, { limite: teto });
+    // No Instagram o "sem site" e o link da bio: mesmo criterio do Radar.
+    const perfis = somenteSemSite ? brutos.filter((p) => !p.site) : brutos;
 
     return perfis.map((perfil) => {
       const radar = avaliarRadarInstagram({

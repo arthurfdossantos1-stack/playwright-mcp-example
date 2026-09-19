@@ -25,9 +25,14 @@ export function FormularioBusca({
   const [cidade, setCidade] = useState("");
   const [pais, setPais] = useState(PAIS_PADRAO);
   const [fonte, setFonte] = useState<FonteBusca>("google");
+  const [noPaisTodo, setNoPaisTodo] = useState(false);
+  const [alvo, setAlvo] = useState(60);
+  const [somenteSemSite, setSomenteSemSite] = useState(false);
   const [projetoId, setProjetoId] = useState(projetoPadrao ?? "");
   const [carregando, setCarregando] = useState(false);
   const sugestoes = acharPais(pais).sugestoes;
+  const nomePais = acharPais(pais).nome;
+  const paisComArtigo = acharPais(pais).comArtigo;
   const [erro, setErro] = useState<string | null>(null);
 
   async function aoEnviar(evento: React.FormEvent) {
@@ -39,7 +44,16 @@ export function FormularioBusca({
       const resposta = await fetch("/api/buscas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nicho, cidade, pais, fonte, projetoId: projetoId || null }),
+        body: JSON.stringify({
+          nicho,
+          cidade,
+          pais,
+          fonte,
+          abrangencia: noPaisTodo ? "pais" : "cidade",
+          alvo,
+          somenteSemSite,
+          projetoId: projetoId || null,
+        }),
       });
 
       const dados = (await resposta.json()) as {
@@ -153,13 +167,68 @@ export function FormularioBusca({
           <input
             id="cidade"
             className="campo"
-            required
+            required={!noPaisTodo}
             minLength={2}
-            value={cidade}
+            value={noPaisTodo ? "" : cidade}
             onChange={(e) => setCidade(e.target.value)}
-            placeholder={acharPais(pais).exemploCidade}
-            disabled={carregando}
+            placeholder={noPaisTodo ? `${nomePais} inteiro` : acharPais(pais).exemploCidade}
+            disabled={carregando || noPaisTodo}
           />
+        </div>
+      </div>
+
+      {/* Abrangência, quantidade e recorte: o que transforma "uma cidade" em
+          "40 imobiliárias sem site no Brasil inteiro". */}
+      <div className="mt-4 rounded-xl border border-slate-200 p-3.5">
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={noPaisTodo}
+            onChange={(e) => setNoPaisTodo(e.target.checked)}
+            disabled={carregando}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-marca-600 focus:ring-marca-500"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-900">
+              Buscar no país inteiro
+            </span>
+            <span className="block text-xs leading-relaxed text-slate-500">
+              Varre as maiores praças {paisComArtigo} e junta, sem repetir. O Google corta em
+              ~60 por cidade, então é assim que dá para cobrir o país.
+            </span>
+          </span>
+        </label>
+
+        <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
+          <div>
+            <label className="rotulo" htmlFor="alvo">
+              Quantas empresas
+            </label>
+            <select
+              id="alvo"
+              className="campo !py-2 !text-sm"
+              value={alvo}
+              onChange={(e) => setAlvo(Number(e.target.value))}
+              disabled={carregando}
+            >
+              {[20, 40, 60, 100].map((n) => (
+                <option key={n} value={n}>
+                  {n} empresas
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2.5 sm:mt-6">
+            <input
+              type="checkbox"
+              checked={somenteSemSite}
+              onChange={(e) => setSomenteSemSite(e.target.checked)}
+              disabled={carregando}
+              className="h-4 w-4 shrink-0 rounded border-slate-300 text-marca-600 focus:ring-marca-500"
+            />
+            <span className="text-sm font-medium text-slate-700">Só quem não tem site</span>
+          </label>
         </div>
       </div>
 

@@ -27,6 +27,20 @@ export type Pais = {
   exemploCidade: string;
   /** Nichos de exemplo, escritos no idioma do país. */
   sugestoes: string[];
+  /**
+   * Nome com artigo, para a frase sair certa em português:
+   * "as maiores praças DO BRASIL", "DA ESPANHA", "DE PORTUGAL".
+   */
+  comArtigo: string;
+  /**
+   * Regiões varridas na busca de país inteiro.
+   *
+   * O Text Search do Google corta em ~60 resultados por consulta, entao
+   * "imobiliaria" sozinho NAO cobre um pais: devolve 60 espalhados e para.
+   * Varrer as maiores praças e juntar, deduplicando por place_id, e o que
+   * chega perto de cobertura nacional de verdade.
+   */
+  regioes: string[];
 };
 
 export const PAISES: Pais[] = [
@@ -39,6 +53,35 @@ export const PAISES: Pais[] = [
     // DDD (2) + 9 + 8 dígitos
     celular: (n) => n.length === 11 && n[2] === "9",
     exemploCidade: "Campinas — SP",
+    comArtigo: "do Brasil",
+    regioes: [
+      "São Paulo SP",
+      "Rio de Janeiro RJ",
+      "Belo Horizonte MG",
+      "Brasília DF",
+      "Curitiba PR",
+      "Porto Alegre RS",
+      "Salvador BA",
+      "Recife PE",
+      "Fortaleza CE",
+      "Goiânia GO",
+      "Campinas SP",
+      "Manaus AM",
+      "Belém PA",
+      "Florianópolis SC",
+      "Vitória ES",
+      "Natal RN",
+      "Cuiabá MT",
+      "Campo Grande MS",
+      "João Pessoa PB",
+      "Maceió AL",
+      "Teresina PI",
+      "São Luís MA",
+      "Londrina PR",
+      "Ribeirão Preto SP",
+      "Joinville SC",
+      "Uberlândia MG",
+    ],
     sugestoes: [
       "clínica odontológica",
       "academia de musculação",
@@ -59,6 +102,19 @@ export const PAISES: Pais[] = [
     // Telemóveis começam com 9
     celular: (n) => n.length === 9 && n.startsWith("9"),
     exemploCidade: "Lisboa",
+    comArtigo: "de Portugal",
+    regioes: [
+      "Lisboa",
+      "Porto",
+      "Braga",
+      "Coimbra",
+      "Faro",
+      "Aveiro",
+      "Setúbal",
+      "Funchal",
+      "Leiria",
+      "Viseu",
+    ],
     sugestoes: [
       "clínica dentária",
       "ginásio",
@@ -79,6 +135,21 @@ export const PAISES: Pais[] = [
     // Móveis começam com 6 ou 7
     celular: (n) => n.length === 9 && /^[67]/.test(n),
     exemploCidade: "Madrid",
+    comArtigo: "da Espanha",
+    regioes: [
+      "Madrid",
+      "Barcelona",
+      "Valencia",
+      "Sevilla",
+      "Zaragoza",
+      "Málaga",
+      "Bilbao",
+      "Murcia",
+      "Palma",
+      "Alicante",
+      "Valladolid",
+      "Vigo",
+    ],
     sugestoes: [
       "clínica dental",
       "gimnasio",
@@ -100,6 +171,24 @@ export const PAISES: Pais[] = [
     // (área e central não podem começar com 0 ou 1).
     celular: (n) => n.length === 10 && /^[2-9]\d{2}[2-9]\d{6}$/.test(n),
     exemploCidade: "Miami, FL",
+    comArtigo: "dos Estados Unidos",
+    regioes: [
+      "New York NY",
+      "Los Angeles CA",
+      "Chicago IL",
+      "Houston TX",
+      "Phoenix AZ",
+      "Philadelphia PA",
+      "San Antonio TX",
+      "San Diego CA",
+      "Dallas TX",
+      "Miami FL",
+      "Atlanta GA",
+      "Boston MA",
+      "Seattle WA",
+      "Denver CO",
+      "Orlando FL",
+    ],
     sugestoes: [
       "dental clinic",
       "gym",
@@ -119,6 +208,19 @@ export const PAISES: Pais[] = [
     digitosNacionais: [10],
     celular: (n) => n.length === 10 && /^[1-9]/.test(n),
     exemploCidade: "Guadalajara",
+    comArtigo: "do México",
+    regioes: [
+      "Ciudad de México",
+      "Guadalajara",
+      "Monterrey",
+      "Puebla",
+      "Tijuana",
+      "León",
+      "Querétaro",
+      "Mérida",
+      "Cancún",
+      "Toluca",
+    ],
     sugestoes: [
       "clínica dental",
       "gimnasio",
@@ -138,6 +240,19 @@ export const PAISES: Pais[] = [
     digitosNacionais: [10],
     celular: (n) => n.length === 10 && /^[1-9]/.test(n),
     exemploCidade: "Buenos Aires",
+    comArtigo: "da Argentina",
+    regioes: [
+      "Buenos Aires",
+      "Córdoba",
+      "Rosario",
+      "Mendoza",
+      "La Plata",
+      "Mar del Plata",
+      "Salta",
+      "Tucumán",
+      "Santa Fe",
+      "Neuquén",
+    ],
     sugestoes: [
       "clínica odontológica",
       "gimnasio",

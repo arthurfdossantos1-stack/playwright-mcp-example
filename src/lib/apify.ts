@@ -192,6 +192,12 @@ async function rodarAtor(
           402,
         );
       }
+      if (resposta.status === 400) {
+        throw new ErroApify(
+          "O ator do Apify recusou os dados da busca. Tente um nicho e uma cidade mais simples, sem pontuação.",
+          400,
+        );
+      }
       if (resposta.status === 404) {
         throw new ErroApify(
           `O ator "${ator.replace("~", "/")}" não existe na sua conta do Apify. Abra a Apify Store, escolha um scraper de busca do Instagram e coloque o id dele (dono/nome) em APIFY_ATOR_BUSCA.`,
@@ -220,6 +226,25 @@ async function rodarAtor(
  * `limite` ja chega cortado pela cota mensal restante — esta funcao so aplica
  * o teto por varredura por cima.
  */
+/**
+ * Caracteres que o ator de busca recusa no campo `search`.
+ *
+ * Ele valida contra uma regex que proibe pontuacao — e a virgula separa
+ * termos, entao "Miami, FL" viraria DUAS buscas. Como a cidade quase sempre
+ * chega formatada ("Florianopolis - SC", "Campinas — SP"), sem limpar isso a
+ * chamada morre com 400 antes de gastar credito.
+ */
+const PROIBIDOS_NA_BUSCA = /[!?.,:;\-+=*&%$#@/\\~^|<>()[\]{}"'`]/g;
+
+/** Deixa so o que o ator aceita: letras (com acento), numeros e espaco. */
+export function termoSeguro(texto: string): string {
+  return texto
+    .replace(/[—–]/g, " ") // travessao nao e proibido, mas nao ajuda a busca
+    .replace(PROIBIDOS_NA_BUSCA, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function buscarPerfis(
   nicho: string,
   cidade: string,
@@ -228,7 +253,13 @@ export async function buscarPerfis(
   const teto = Math.max(0, Math.min(opcoes.limite ?? maxPorBusca(), maxPorBusca()));
   if (teto === 0) return [];
 
-  const termo = `${nicho.trim()} ${cidade.trim()}`.trim();
+  const termo = termoSeguro(`${nicho} ${cidade}`);
+  if (!termo) {
+    throw new ErroApify(
+      "O nicho e a cidade ficaram vazios depois de tirar a pontuação que o Instagram não aceita na busca.",
+      400,
+    );
+  }
 
   const itens = await rodarAtor(
     atorBusca(),

@@ -194,6 +194,53 @@ export async function buscarEmpresas(
   return encontrados;
 }
 
+/**
+ * Varre um nicho no PAIS inteiro.
+ *
+ * Nao existe "buscar no Brasil" numa chamada so: o Text Search corta em ~60
+ * resultados, entao "imobiliaria" devolveria 60 espalhados e pararia. Aqui
+ * rodamos o nicho praca por praca (as maiores do pais) e juntamos,
+ * deduplicando por place_id, ate alcancar o alvo.
+ *
+ * Para assim que o alvo e atingido — cada praca a mais e cota gasta a toa.
+ */
+export async function buscarEmpresasNoPais(
+  nicho: string,
+  opcoes: { pais?: string; alvo?: number; sinal?: AbortSignal } = {},
+): Promise<PlaceResumo[]> {
+  const pais = acharPais(opcoes.pais);
+  const alvo = Math.max(1, opcoes.alvo ?? 40);
+
+  const encontrados: PlaceResumo[] = [];
+  const vistos = new Set<string>();
+
+  for (const regiao of pais.regioes) {
+    if (encontrados.length >= alvo) break;
+
+    let daRegiao: PlaceResumo[] = [];
+    try {
+      daRegiao = await buscarEmpresas(nicho, regiao, {
+        pais: opcoes.pais,
+        sinal: opcoes.sinal,
+      });
+    } catch (e) {
+      // Uma praca falhar nao pode derrubar a varredura inteira: cota
+      // estourada numa cidade ainda deixa as outras renderem resultado.
+      if (e instanceof ErroPlaces && e.status === 429) continue;
+      throw e;
+    }
+
+    for (const empresa of daRegiao) {
+      if (vistos.has(empresa.placeId)) continue;
+      vistos.add(empresa.placeId);
+      encontrados.push(empresa);
+      if (encontrados.length >= alvo) break;
+    }
+  }
+
+  return encontrados;
+}
+
 const TENTATIVAS_DETALHE = 3;
 
 function dormir(ms: number): Promise<void> {
