@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { adicionarLead, desfazerContatadoFila, marcarContatadoFila, removerLead } from "@/app/app/acoes";
+import { adicionarLead, removerLead } from "@/app/app/acoes";
+import {
+  desfazerContato,
+  idsPendentes,
+  marcarContato,
+  reenviarPendentes,
+} from "@/lib/fila-pendente";
 import { SeloPrioridade } from "./SeloPrioridade";
 import { SeloStatus } from "./SeloStatus";
 import { aplicarVariaveis, contextoDaEmpresa } from "@/lib/templates";
@@ -77,6 +83,20 @@ export function FilaWhatsapp({
     };
   }, []);
 
+  /**
+   * Ao abrir a tela: esconde na hora os leads cuja marcação ainda não foi
+   * confirmada pelo servidor e tenta entregá-las de novo. É isto que impede
+   * o lead já contatado de reaparecer quando você fecha e abre o site.
+   */
+  useEffect(() => {
+    const pendentes = idsPendentes();
+    if (pendentes.length > 0) {
+      const esconder = new Set(pendentes);
+      setFila((lista) => lista.filter((e) => !esconder.has(e.id)));
+    }
+    void reenviarPendentes();
+  }, []);
+
   /** Repõe um item na posição em que ele estava, sem duplicar. */
   const repor = useCallback(({ item, posicao }: Desfazivel) => {
     setFila((atual) => {
@@ -113,12 +133,16 @@ export function FilaWhatsapp({
     setDesfazivel({ item, posicao: 0, tipo: "enviado" });
     agendarLimpezaDoDesfazer();
 
-    void marcarContatadoFila(item.id, item.leadId).then((resposta) => {
-      if (!resposta.ok) {
-        setErro(resposta.erro ?? "Não foi possível marcar como contatado.");
-        setEnviados((n) => Math.max(0, n - 1));
-        setDesfazivel((atual) => (atual?.item.id === item.id ? null : atual));
-        repor({ item, posicao: 0, tipo: "enviado" });
+    // `marcarContato` grava na caixa de saída ANTES de tentar a rede e usa
+    // keepalive: mesmo que o WhatsApp roube o foco e o navegador descarte a
+    // página, a marcação chega — e, se não chegar, volta no próximo abrir.
+    void marcarContato(item.id, item.leadId).then((ok) => {
+      if (!ok) {
+        // Fica pendente na caixa de saída: o lead não volta pra fila agora,
+        // senão a pessoa mandaria mensagem duas vezes para o mesmo contato.
+        setErro(
+          "Sem conexão para confirmar o contato. Ele foi guardado e será registrado assim que a internet voltar.",
+        );
       }
     });
   }
@@ -162,8 +186,8 @@ export function FilaWhatsapp({
 
     if (alvo.tipo === "enviado") {
       setEnviados((n) => Math.max(0, n - 1));
-      void desfazerContatadoFila(alvo.item.id, alvo.item.leadId).then((resposta) => {
-        if (!resposta.ok) setErro(resposta.erro ?? "Não foi possível desfazer.");
+      void desfazerContato(alvo.item.id, alvo.item.leadId).then((ok) => {
+        if (!ok) setErro("Não foi possível desfazer agora.");
       });
       return;
     }

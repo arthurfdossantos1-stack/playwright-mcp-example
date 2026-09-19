@@ -796,6 +796,47 @@ export async function desfazerContatadoFila(
   }
 }
 
+/**
+ * Devolve a fila de mensagens os leads do funil que ja foram marcados como
+ * contatados.
+ *
+ * Serve pra dois casos: voce quer mandar uma segunda mensagem pra quem nao
+ * respondeu, ou o contato foi marcado sem voce ter enviado nada. Nao apaga
+ * historico: so limpa a marca que tira o lead da fila.
+ */
+export async function devolverContatadosAFila(): Promise<Resposta & { total?: number }> {
+  try {
+    const { supabase, user } = await exigirUsuario();
+
+    // So empresas que ainda estao no funil em etapa ativa — nao faz sentido
+    // ressuscitar quem ja respondeu ou fechou.
+    const { data: leads, error: erroLeads } = await supabase
+      .from("leads")
+      .select("empresa_id")
+      .eq("user_id", user.id)
+      .in("status", ["novo", "contatado"]);
+    if (erroLeads) throw erroLeads;
+
+    const ids = (leads ?? []).map((l) => l.empresa_id);
+    if (ids.length === 0) return { ok: true, total: 0 };
+
+    const { data: atualizadas, error } = await supabase
+      .from("empresas")
+      .update({ contatado_fila_em: null })
+      .eq("user_id", user.id)
+      .in("id", ids)
+      .not("contatado_fila_em", "is", null)
+      .select("id");
+    if (error) throw error;
+
+    revalidatePath("/app/enviar-mensagem");
+    revalidatePath("/app/leads");
+    return { ok: true, total: atualizadas?.length ?? 0 };
+  } catch (e) {
+    return falha(e);
+  }
+}
+
 // --------------------------------------------------- PREVIA DE SITE (IA)
 
 export type RespostaPrevia = Resposta & { prompt?: string; restantes?: number; limite?: number };

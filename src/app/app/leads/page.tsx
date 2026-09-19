@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { CabecalhoPagina, EstadoVazio } from "@/components/app/Cabecalho";
 import { FunilLeads, type LeadCartao } from "@/components/app/FunilLeads";
+import { PainelEnvioFunil } from "@/components/app/PainelEnvioFunil";
 import type { Cadencia, LeadStatus, PrioridadeRadar, Projeto } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Leads" };
@@ -23,7 +24,8 @@ type LinhaLead = {
     nota: number | null;
     total_avaliacoes: number;
     prioridade: PrioridadeRadar;
-  contatado_fila_em: string | null;
+    contatado_fila_em: string | null;
+    whatsapp_e164: string | null;
   } | null;
 };
 
@@ -38,7 +40,7 @@ export default async function PaginaLeads({
   let consulta = supabase
     .from("leads")
     .select(
-      "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade, contatado_fila_em )",
+      "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade, contatado_fila_em, whatsapp_e164 )",
     )
     .order("posicao", { ascending: true })
     .order("criado_em", { ascending: false });
@@ -75,6 +77,19 @@ export default async function PaginaLeads({
         : null,
     };
   });
+
+  // Mesmo critério da /app/enviar-mensagem, para os números baterem com o que
+  // a fila realmente mostra.
+  const ativos = ((leads ?? []) as unknown as LinhaLead[]).filter(
+    (l) => l.status === "novo" || l.status === "contatado",
+  );
+  const comEmpresa = ativos
+    .map((l) => (Array.isArray(l.empresas) ? l.empresas[0] : l.empresas))
+    .filter((e): e is NonNullable<LinhaLead["empresas"]> => Boolean(e));
+
+  const prontos = comEmpresa.filter((e) => e.whatsapp_e164 && !e.contatado_fila_em).length;
+  const semWhatsapp = comEmpresa.filter((e) => !e.whatsapp_e164).length;
+  const jaContatados = comEmpresa.filter((e) => e.whatsapp_e164 && e.contatado_fila_em).length;
 
   const listaProjetos = (projetos ?? []) as Projeto[];
 
@@ -114,6 +129,14 @@ export default async function PaginaLeads({
             </Link>
           ))}
         </div>
+      )}
+
+      {cartoes.length > 0 && (
+        <PainelEnvioFunil
+          prontos={prontos}
+          semWhatsapp={semWhatsapp}
+          jaContatados={jaContatados}
+        />
       )}
 
       {cartoes.length === 0 ? (
