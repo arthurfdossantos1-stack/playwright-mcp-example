@@ -162,7 +162,9 @@ export async function POST(request: Request) {
       cidade,
       pais,
       fonte,
-      termo: montarTermo(nicho, cidade, pais),
+      termo: noPaisTodo
+        ? `${nicho} ${acharPais(pais).comArtigo}`
+        : montarTermo(nicho, cidade, pais),
       status: "processando",
     })
     .select("id")
@@ -329,7 +331,17 @@ export async function POST(request: Request) {
   }
 
   async function coletarDoInstagram(teto: number): Promise<LinhaEmpresa[]> {
-    const brutos = await buscarPerfis(nicho, cidade, { limite: teto });
+    // No modo país NÃO mandamos o nome do país junto: a busca do Instagram é
+    // por palavra, então "imobiliária Brasil" traz perfis com "Brasil" NO
+    // NOME, não imobiliárias pelo Brasil. Sem o termo de lugar, a busca volta
+    // a ser pelo nicho — e como o nicho já vem no idioma do país, o resultado
+    // sai naturalmente do país certo.
+    //
+    // Varrer praça por praça como no Google não cabe aqui: cada praça é uma
+    // execução do ator, e 26 execuções em sequência estouram o limite de
+    // 60 segundos da rota.
+    const ondeBuscar = noPaisTodo ? "" : cidade;
+    const brutos = await buscarPerfis(nicho, ondeBuscar, { limite: teto });
     // No Instagram o "sem site" e o link da bio: mesmo criterio do Radar.
     const perfis = somenteSemSite ? brutos.filter((p) => !p.site) : brutos;
 
