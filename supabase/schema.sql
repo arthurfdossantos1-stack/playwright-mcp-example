@@ -75,6 +75,9 @@ create table if not exists public.buscas (
   -- ISO 3166-1 alpha-2: define regionCode/languageCode da Places API e a
   -- regra de celular que a fila de WhatsApp aplica.
   pais            text not null default 'BR',
+  -- Origem: 'google' (Places), 'instagram' (via Apify) ou 'ambos'.
+  fonte           text not null default 'google'
+                    check (fonte in ('google', 'instagram', 'ambos')),
   termo           text not null,
   status          busca_status not null default 'processando',
   total_resultados integer not null default 0,
@@ -92,7 +95,12 @@ create table if not exists public.empresas (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null references auth.users (id) on delete cascade,
   busca_id          uuid not null references public.buscas (id) on delete cascade,
+  -- Chave de deduplicacao dentro da varredura. No Google e o place_id; no
+  -- Instagram usamos "ig:<username>", que cumpre o mesmo papel.
   place_id          text not null,
+  -- Numa varredura "ambos" as duas origens convivem, entao a marca fica aqui.
+  fonte             text not null default 'google'
+                      check (fonte in ('google', 'instagram')),
   nome              text not null,
   endereco          text,
   telefone          text,
@@ -115,6 +123,12 @@ create table if not exists public.empresas (
   -- Quantidade de fotos que o Place Details retornou (usado so como contexto
   -- textual no prompt de previa de site, nunca baixamos as imagens).
   fotos_total       integer not null default 0,
+  -- Dados que so o Instagram tem. `instagram` (URL) vale para as duas origens.
+  instagram_username   text,
+  instagram_seguidores integer,
+  instagram_bio        text,
+  -- Sinal mais forte do Radar num lead de Instagram: perfil ativo sem site.
+  instagram_site_na_bio boolean not null default false,
   criado_em         timestamptz not null default now(),
   unique (busca_id, place_id)
 );
@@ -123,6 +137,9 @@ create index if not exists empresas_busca_idx on public.empresas (busca_id);
 create index if not exists empresas_prioridade_idx on public.empresas (user_id, prioridade);
 create index if not exists empresas_fila_whatsapp_idx
   on public.empresas (user_id, whatsapp_verificado, contatado_fila_em, score_radar desc);
+-- Suporta a contagem da cota mensal do Apify (empresas de origem Instagram).
+create index if not exists empresas_fonte_mes_idx
+  on public.empresas (user_id, fonte, criado_em desc);
 
 -- ---------------------------------------------------------------------------
 -- leads: empresas selecionadas e movidas pelo funil

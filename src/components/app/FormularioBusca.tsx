@@ -4,6 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Projeto } from "@/lib/types";
 import { PAISES, PAIS_PADRAO, acharPais } from "@/lib/paises";
+import type { FonteBusca } from "@/lib/types";
+
+const FONTES: { id: FonteBusca; rotulo: string; explica: string }[] = [
+  { id: "google", rotulo: "Google", explica: "Empresas no Google Maps: telefone, endereço e avaliações." },
+  { id: "instagram", rotulo: "Instagram", explica: "Perfis do nicho na cidade. Acha negócio que existe só no Instagram." },
+  { id: "ambos", rotulo: "Os dois", explica: "Junta as duas fontes numa lista só, marcando de onde veio cada lead." },
+];
 
 export function FormularioBusca({
   projetos,
@@ -16,6 +23,7 @@ export function FormularioBusca({
   const [nicho, setNicho] = useState("");
   const [cidade, setCidade] = useState("");
   const [pais, setPais] = useState(PAIS_PADRAO);
+  const [fonte, setFonte] = useState<FonteBusca>("google");
   const [projetoId, setProjetoId] = useState(projetoPadrao ?? "");
   const [carregando, setCarregando] = useState(false);
   const sugestoes = acharPais(pais).sugestoes;
@@ -30,15 +38,29 @@ export function FormularioBusca({
       const resposta = await fetch("/api/buscas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nicho, cidade, pais, projetoId: projetoId || null }),
+        body: JSON.stringify({ nicho, cidade, pais, fonte, projetoId: projetoId || null }),
       });
 
-      const dados = (await resposta.json()) as { buscaId?: string; erro?: string };
+      const dados = (await resposta.json()) as {
+        buscaId?: string;
+        erro?: string;
+        avisos?: string[];
+      };
 
       if (!resposta.ok) {
         setErro(dados.erro ?? "Não foi possível concluir a varredura.");
         setCarregando(false);
         return;
+      }
+
+      // Aviso nao e erro: a varredura concluiu, algo so nao rodou por inteiro
+      // (tipicamente a cota do Instagram). Fica guardado pra tela de resultado.
+      if (dados.avisos?.length) {
+        try {
+          sessionStorage.setItem("rastrolead:avisos-busca", JSON.stringify(dados.avisos));
+        } catch {
+          /* sem storage o aviso so se perde */
+        }
       }
 
       router.push(`/app/resultados/${dados.buscaId}`);
@@ -51,6 +73,31 @@ export function FormularioBusca({
 
   return (
     <form onSubmit={aoEnviar} className="cartao p-6 sm:p-7">
+      <div className="mb-5">
+        <span className="rotulo">Onde buscar</span>
+        <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-slate-100 p-1">
+          {FONTES.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFonte(item.id)}
+              aria-pressed={fonte === item.id}
+              disabled={carregando}
+              className={`rounded-lg px-2 py-2 text-sm font-semibold transition ${
+                fonte === item.id
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {item.rotulo}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+          {FONTES.find((f) => f.id === fonte)?.explica}
+        </p>
+      </div>
+
       <div className="mb-4">
         <label className="rotulo" htmlFor="pais">
           País
@@ -69,7 +116,9 @@ export function FormularioBusca({
           ))}
         </select>
         <p className="mt-1.5 text-xs text-slate-500">
-          Define o idioma dos resultados e a regra de celular usada na fila de WhatsApp.
+          {fonte === "instagram"
+            ? "Define a regra de celular usada na fila de WhatsApp."
+            : "Define o idioma dos resultados e a regra de celular usada na fila de WhatsApp."}
         </p>
       </div>
 

@@ -27,6 +27,16 @@ export function inicioDoDiaBrasil(agora: Date = new Date()): Date {
   return new Date(Date.UTC(ano, mes - 1, dia, 3, 0, 0, 0));
 }
 
+/**
+ * Primeiro dia do mes corrente no fuso de Sao Paulo.
+ * Usado pra contar a cota mensal do Apify (ciclo de credito).
+ */
+export function inicioDoMesBrasil(agora: Date = new Date()): Date {
+  const partes = FORMATADOR.formatToParts(agora);
+  const valor = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
+  return new Date(Date.UTC(valor("year"), valor("month") - 1, 1, 3, 0, 0, 0));
+}
+
 /** "27/03/2025" no fuso do Brasil - so pra exibir/depurar. */
 export function dataBrasil(agora: Date = new Date()): string {
   return FORMATADOR.format(agora);

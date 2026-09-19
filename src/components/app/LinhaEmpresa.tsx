@@ -63,6 +63,7 @@ export function LinhaEmpresa({
   });
   const descricao = STATUS_LEAD[status];
   const whatsapp = linkWhatsappEmpresa(empresa);
+  const ehInstagram = empresa.fonte === "instagram";
 
   return (
     <li className={aberto ? "bg-slate-50/60" : undefined}>
@@ -100,8 +101,24 @@ export function LinhaEmpresa({
             <span className="block truncate text-sm font-semibold text-slate-900">
               {empresa.nome}
             </span>
-            <span className="block truncate text-[11px] leading-tight text-slate-500">
-              {empresa.endereco ?? empresa.categoria ?? "Sem endereço"}
+            <span className="flex min-w-0 items-center gap-1 text-[11px] leading-tight text-slate-500">
+              {ehInstagram && (
+                <svg viewBox="0 0 24 24" aria-label="Instagram" className="h-3 w-3 shrink-0 fill-current text-violet-500">
+                  <path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.05 1.8.25 2.2.42.6.22 1 .48 1.4.9.43.42.7.82.91 1.38.17.44.37 1.06.42 2.24.06 1.28.07 1.66.07 4.89s0 3.6-.07 4.9c-.05 1.17-.25 1.79-.42 2.23-.22.56-.48.96-.9 1.38-.43.42-.83.68-1.39.9-.44.17-1.06.37-2.23.42-1.28.06-1.66.07-4.89.07s-3.6 0-4.9-.07c-1.17-.05-1.79-.25-2.23-.42-.56-.22-.96-.48-1.38-.9-.42-.42-.68-.82-.9-1.38-.17-.44-.37-1.06-.42-2.24C2.21 15.6 2.2 15.2 2.2 12s0-3.6.07-4.9c.05-1.17.25-1.79.42-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.44-.17 1.06-.37 2.24-.42C8.4 2.21 8.8 2.2 12 2.2Zm0 5.4a4.4 4.4 0 1 0 0 8.8 4.4 4.4 0 0 0 0-8.8Zm0 7.26a2.86 2.86 0 1 1 0-5.72 2.86 2.86 0 0 1 0 5.72Zm5.6-7.44a1.03 1.03 0 1 1-2.06 0 1.03 1.03 0 0 1 2.06 0Z" />
+                </svg>
+              )}
+              <span className="truncate">
+                {ehInstagram
+                  ? [
+                      empresa.instagram_username ? `@${empresa.instagram_username}` : null,
+                      empresa.instagram_seguidores != null
+                        ? `${empresa.instagram_seguidores.toLocaleString("pt-BR")} seguidores`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Perfil do Instagram"
+                  : (empresa.endereco ?? empresa.categoria ?? "Sem endereço")}
+              </span>
             </span>
           </span>
         </button>
@@ -158,14 +175,23 @@ export function LinhaEmpresa({
           {empresa.endereco && (
             <p className="mb-3 text-sm text-slate-600">{empresa.endereco}</p>
           )}
+          {empresa.instagram_bio && (
+            <p className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+              {empresa.instagram_bio}
+            </p>
+          )}
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
             <div className="min-w-0">
-              <dt className="text-[11px] font-medium text-slate-400">Avaliações</dt>
+              <dt className="text-[11px] font-medium text-slate-400">
+                {ehInstagram ? "Seguidores" : "Avaliações"}
+              </dt>
               <dd className="truncate text-slate-700">
-                {empresa.nota != null
-                  ? `${empresa.nota.toFixed(1)} (${empresa.total_avaliacoes})`
-                  : "Sem avaliações"}
+                {ehInstagram
+                  ? (empresa.instagram_seguidores?.toLocaleString("pt-BR") ?? "—")
+                  : empresa.nota != null
+                    ? `${empresa.nota.toFixed(1)} (${empresa.total_avaliacoes})`
+                    : "Sem avaliações"}
               </dd>
             </div>
 

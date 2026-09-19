@@ -8,6 +8,18 @@ export type PrioridadeRadar = "alta" | "media_alta" | "media" | "baixa";
 
 export type BuscaStatus = "processando" | "concluida" | "erro";
 
+/** De onde os leads de uma varredura vem. */
+export type FonteBusca = "google" | "instagram" | "ambos";
+
+/** Origem de uma empresa. "ambos" so existe na busca, nunca na empresa. */
+export type FonteEmpresa = "google" | "instagram";
+
+export const FONTE_LABEL: Record<FonteBusca, string> = {
+  google: "Google",
+  instagram: "Instagram",
+  ambos: "Google + Instagram",
+};
+
 export type CanalContato = "whatsapp" | "email" | "instagram" | "telefone" | "outro";
 
 export type CadenciaLeadStatus = "ativa" | "pausada" | "concluida" | "cancelada";
@@ -70,6 +82,7 @@ export type Busca = {
   nicho: string;
   cidade: string;
   pais: string;
+  fonte: FonteBusca;
   termo: string;
   status: BuscaStatus;
   total_resultados: number;
@@ -83,6 +96,7 @@ export type Empresa = {
   user_id: string;
   busca_id: string;
   place_id: string;
+  fonte: FonteEmpresa;
   nome: string;
   endereco: string | null;
   telefone: string | null;
@@ -101,6 +115,10 @@ export type Empresa = {
   whatsapp_verificado: boolean;
   contatado_fila_em: string | null;
   fotos_total: number;
+  instagram_username: string | null;
+  instagram_seguidores: number | null;
+  instagram_bio: string | null;
+  instagram_site_na_bio: boolean;
   criado_em: string;
 };
 
