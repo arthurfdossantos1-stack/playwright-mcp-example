@@ -27,10 +27,10 @@ excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
   Ex: excluir rifa  /  excluir rifa 2
 
 *Registrar vendas*
-<numero> <nome do comprador> - forma rapida de registrar uma venda
-  Ex: 23 Joao Silva
-vender <numero> <nome> - mesma coisa, por extenso
-  Ex: vender 23 Joao Silva
+<numero(s)> <nome do comprador> - forma rapida de registrar uma venda
+  Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva (varios numeros de uma vez)
+vender <numero(s)> <nome> - mesma coisa, por extenso
+  Ex: vender 23 Joao Silva  /  vender 1,2,3 Joao Silva
 desfazer <numero> - libera de novo um numero vendido por engano (igual "excluir <numero>")
   Ex: desfazer 23
 
@@ -62,22 +62,61 @@ function requireActive() {
   return { raffle, error: null };
 }
 
-function sell(numero, buyer) {
+// Aceita "23", "1,2,3" ou "1, 2, 3" e devolve os numeros como array. Retorna
+// null se algum pedaco nao for um numero valido.
+function parseNumberList(str) {
+  const numbers = str
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(Number);
+  if (numbers.length === 0 || numbers.some((n) => !Number.isInteger(n) || n <= 0)) return null;
+  return numbers;
+}
+
+// Reconhece "<numero(s)> <nome>" no comeco do texto, ex: "23 Joao Silva" ou
+// "1,2,3 Joao Silva". Retorna null se o texto nao comecar com numero(s).
+function parseSaleArgs(text) {
+  const match = text.match(/^(\d+(?:\s*,\s*\d+)*)\s+(.+)$/);
+  if (!match) return null;
+  const numbers = parseNumberList(match[1]);
+  const buyer = match[2].trim();
+  if (!numbers || !buyer) return null;
+  return { numbers, buyer };
+}
+
+function sellMultiple(numbers, buyer) {
   const { raffle, error } = requireActive();
   if (error) return error;
   if (!buyer) return 'Informe o nome do comprador, ex: 23 Joao Silva';
-  const result = sellNumber(raffle.id, numero, buyer);
-  if (!result.ok) {
+
+  const vendidos = [];
+  const falhas = [];
+  for (const numero of numbers) {
+    const result = sellNumber(raffle.id, numero, buyer);
+    if (result.ok) {
+      vendidos.push(numero);
+      continue;
+    }
     if (result.reason === 'fora_do_intervalo') {
-      return `O numero ${numero} nao existe nessa rifa (1 a ${raffle.total}).`;
+      falhas.push(`${numero} (fora do intervalo, 1 a ${raffle.total})`);
+    } else if (result.reason === 'ja_vendido') {
+      falhas.push(`${numero} (ja vendido para ${result.buyer})`);
+    } else {
+      falhas.push(`${numero} (erro ao registrar)`);
     }
-    if (result.reason === 'ja_vendido') {
-      return `O numero ${numero} ja foi vendido para ${result.buyer}.`;
-    }
-    return 'Nao foi possivel registrar a venda.';
+  }
+
+  const partes = [];
+  if (vendidos.length > 0) {
+    partes.push(`Registrado: numero(s) ${vendidos.join(', ')} vendido(s) para ${buyer}.`);
+  }
+  if (falhas.length > 0) {
+    partes.push(`Nao deu pra registrar: ${falhas.join(', ')}.`);
   }
   const remaining = getAvailableNumbers(raffle.id).length;
-  return `Registrado: numero ${numero} vendido para ${buyer}.\nRestam ${remaining}/${raffle.total} numeros.`;
+  partes.push(`Restam ${remaining}/${raffle.total} numeros.`);
+  return partes.join('\n');
 }
 
 function undoNumberCommand(numero) {
@@ -115,16 +154,12 @@ export function handleCommand(rawText) {
     return `Oi! Estou online. Mande "ajuda" para ver os comandos.`;
   }
 
-  const tokens = text.split(/\s+/);
-  const firstAsNumber = Number(tokens[0]);
-  const looksLikeShorthandSale =
-    Number.isInteger(firstAsNumber) && firstAsNumber > 0 && tokens.length > 1;
-
-  if (looksLikeShorthandSale) {
-    const buyer = text.slice(tokens[0].length).trim();
-    return sell(firstAsNumber, buyer);
+  const shorthandSale = parseSaleArgs(text);
+  if (shorthandSale) {
+    return sellMultiple(shorthandSale.numbers, shorthandSale.buyer);
   }
 
+  const tokens = text.split(/\s+/);
   const [cmdRaw, ...rest] = tokens;
   const cmd = stripAccents(cmdRaw.toLowerCase().replace(/^\//, ''));
 
@@ -146,13 +181,11 @@ export function handleCommand(rawText) {
     }
 
     case 'vender': {
-      const [numStr, ...nameParts] = rest;
-      const numero = Number(numStr);
-      const buyer = nameParts.join(' ');
-      if (!Number.isInteger(numero) || !buyer) {
-        return 'Uso: vender <numero> <nome do comprador>';
+      const saleArgs = parseSaleArgs(rest.join(' '));
+      if (!saleArgs) {
+        return 'Uso: vender <numero>[,<numero>,...] <nome do comprador>\n  Ex: vender 1,2,3 Joao Silva';
       }
-      return sell(numero, buyer);
+      return sellMultiple(saleArgs.numbers, saleArgs.buyer);
     }
 
     case 'desfazer':
