@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
+  downloadMediaMessage,
   DisconnectReason,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
@@ -13,6 +14,7 @@ import qrcode from 'qrcode-terminal';
 import QRCode from 'qrcode';
 import { handleCommand } from './commands.js';
 import { isAuthorizedGroup, addAuthorizedGroup, removeAuthorizedGroup } from './groups.js';
+import { createStickerFromMedia } from './sticker.js';
 
 // A biblioteca de criptografia (libsignal) usa console.info diretamente para
 // avisos de rotina ("Closing session", "Opening session"...), ignorando o
@@ -118,7 +120,9 @@ function unwrapMessage(message) {
 function getText(msg) {
   const m = unwrapMessage(msg.message);
   if (!m) return null;
-  return m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || null;
+  return (
+    m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || m.videoMessage?.caption || null
+  );
 }
 
 // Guarda a chave da ultima mensagem que o bot mandou em cada conversa, para
@@ -132,6 +136,75 @@ async function sendChunked(sock, jid, text) {
     sent = await sock.sendMessage(jid, { text: text.slice(i, i + MAX_LEN) });
   }
   return sent;
+}
+
+const STICKER_TRIGGERS = new Set(['sticker', 'figurinha']);
+function isStickerTrigger(text) {
+  if (!text) return false;
+  return STICKER_TRIGGERS.has(text.trim().toLowerCase().replace(/^!/, ''));
+}
+
+// Guarda a ultima mensagem com imagem/video recebida em cada conversa, para
+// o comando de figurinha poder usar mesmo sem responder/citar a midia.
+const lastReceivedMedia = new Map();
+
+function hasStickerableMedia(message) {
+  return !!(message?.imageMessage || message?.videoMessage);
+}
+
+// Acha qual midia usar para o comando de figurinha: a da propria mensagem
+// (imagem/video com legenda "figurinha"), a de uma mensagem citada/respondida,
+// ou a ultima midia recebida naquela conversa.
+function resolveStickerSource(msg, remoteJid) {
+  const own = unwrapMessage(msg.message);
+  if (hasStickerableMedia(own)) return { key: msg.key, message: own };
+
+  const quoted = own?.extendedTextMessage?.contextInfo?.quotedMessage;
+  if (hasStickerableMedia(quoted)) {
+    const ctx = own.extendedTextMessage.contextInfo;
+    return {
+      key: {
+        remoteJid,
+        id: ctx.stanzaId,
+        fromMe: false,
+        participant: ctx.participant,
+      },
+      message: quoted,
+    };
+  }
+
+  return lastReceivedMedia.get(remoteJid) || null;
+}
+
+async function handleStickerRequest(sock, msg, remoteJid) {
+  const mediaMsg = resolveStickerSource(msg, remoteJid);
+  if (!mediaMsg) {
+    await sendChunked(
+      sock,
+      remoteJid,
+      'Manda uma imagem ou video/GIF (pode ser respondendo ela com "figurinha", ou so mandar "figurinha" logo depois).'
+    );
+    return;
+  }
+
+  const isVideo = !!unwrapMessage(mediaMsg.message)?.videoMessage;
+
+  try {
+    const buffer = await downloadMediaMessage(mediaMsg, 'buffer', {}, {
+      logger: pino({ level: 'silent' }),
+      reuploadRequest: sock.updateMediaMessage,
+    });
+    const webp = await createStickerFromMedia(buffer, { animated: isVideo });
+    const sent = await sock.sendMessage(remoteJid, { sticker: webp, isAnimated: isVideo });
+    lastSentMessageKey.set(remoteJid, sent.key);
+  } catch (err) {
+    console.error('[erro figurinha]', err?.message || err);
+    await sendChunked(
+      sock,
+      remoteJid,
+      `Nao consegui criar a figurinha: ${err?.message || 'erro desconhecido'}`
+    );
+  }
 }
 
 async function processMessage(sock, msg) {
@@ -177,6 +250,17 @@ async function processMessage(sock, msg) {
   );
 
   if (!isSelfChat && !isFromAuthorizedNumber && !isGroupAllowed) return;
+
+  const unwrapped = unwrapMessage(msg.message);
+  if (hasStickerableMedia(unwrapped)) {
+    lastReceivedMedia.set(remoteJid, { key: msg.key, message: unwrapped });
+  }
+
+  if (isStickerTrigger(text)) {
+    await handleStickerRequest(sock, msg, remoteJid);
+    return;
+  }
+
   if (!text) return;
 
   const reply = await handleCommand(text);

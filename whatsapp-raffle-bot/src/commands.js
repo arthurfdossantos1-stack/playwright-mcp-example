@@ -63,6 +63,11 @@ pix - mostra os dados de pagamento configurados
 apagar - apaga a ultima mensagem que o bot mandou aqui
 ajuda - mostra esta mensagem${BOT_NAME ? `\nmandar so "${BOT_NAME}" - confirma que o bot esta online` : ''}
 
+*Figurinhas:* manda uma imagem (ou video/GIF) e, na legenda ou logo em
+seguida, "figurinha" (ou "sticker"). Video/GIF vira figurinha animada,
+foto vira figurinha normal. Tambem funciona respondendo uma imagem/video
+ja enviado com "figurinha". Precisa do ffmpeg instalado (pkg install ffmpeg).
+
 Os comandos funcionam com ou sem acento e em qualquer combinacao de
 maiuscula/minuscula (disponiveis = disponíveis = DISPONÍVEIS). O bot so
 responde a comandos - mensagem solta tipo "oi" fica sem resposta.

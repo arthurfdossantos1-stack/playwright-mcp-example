@@ -62,6 +62,22 @@ ou `PIX_MESSAGE` se quiser controlar o texto inteiro. Veja o `.env.example`.
 Os comandos funcionam com ou sem acento e em qualquer combinação de maiúsculas/minúsculas
 (`disponiveis`, `disponíveis`, `DISPONÍVEIS` — todos funcionam igual).
 
+### Criar figurinhas
+
+Manda uma imagem (ou vídeo/GIF) com a legenda `figurinha` (ou `sticker`) — ou manda a
+imagem/vídeo primeiro e o "figurinha" logo depois, ou responde a uma imagem/vídeo já enviado
+com "figurinha". Foto vira figurinha estática; vídeo/GIF vira figurinha **animada** (limitada aos
+primeiros 6 segundos).
+
+Precisa do **ffmpeg** instalado (é ele que faz a conversão pra `.webp`, formato de figurinha do
+WhatsApp):
+
+```bash
+pkg install ffmpeg
+```
+
+Sem o ffmpeg instalado, o bot avisa no chat que não conseguiu criar a figurinha.
+
 ### Confirmar que o bot está online
 
 Se preencher `BOT_NAME` no `.env` (ex: `BOT_NAME=Pierre`), mandar só esse nome funciona como
