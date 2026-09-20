@@ -37,8 +37,10 @@ usar <id> - troca qual rifa fica ativa (se voce tiver mais de uma)
   Ex: usar 2
 excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
   Ex: excluir rifa  /  excluir rifa 2
-titulo <valor> <data do sorteio> - define o titulo que aparece no topo da
-  imagem do "disponiveis" (valor por numero + data do sorteio)
+renomear <novo nome> - muda o nome da rifa ativa
+  Ex: renomear Rifa de Fim de Ano
+titulo <valor> <data do sorteio> - define valor por numero + data do sorteio,
+  que aparecem no topo da imagem do "disponiveis"
   Ex: titulo 5,00 20/10/2026
 
 *Registrar vendas*
@@ -351,6 +353,16 @@ export async function handleCommand(rawText) {
       if (error) return error;
       setRaffleInfo(raffle.id, { price: valor, drawDate: data });
       return `Titulo definido para "${raffle.name}":\nCada numero: R$ ${valor}\nSorteio: ${data}\nAgora "disponiveis" ja mostra isso na imagem.`;
+    }
+
+    case 'renomear': {
+      const novoNome = rest.join(' ').trim();
+      if (!novoNome) return 'Uso: renomear <novo nome>\n  Ex: renomear Rifa de Fim de Ano';
+      const { raffle, error } = requireActive();
+      if (error) return error;
+      const nomeAntigo = raffle.name;
+      setRaffleInfo(raffle.id, { name: novoNome });
+      return `Rifa renomeada de "${nomeAntigo}" para "${novoNome}".`;
     }
 
     case 'vendidos': {

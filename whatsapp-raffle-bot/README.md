@@ -30,6 +30,7 @@ Mensagens comuns, tipo "oi" ou papo aleatório, ficam sem resposta.
 
 ```
 nova <quantidade> [nome]        cria uma rifa nova (fica ativa). Ex: nova 500 Rifa de Pascoa
+renomear <novo nome>            muda o nome da rifa ativa. Ex: renomear Rifa de Fim de Ano
 titulo <valor> <data>           define valor por numero + data do sorteio, que passam a
                                  aparecer no topo da imagem do "disponiveis"
                                  Ex: titulo 5,00 20/10/2026
