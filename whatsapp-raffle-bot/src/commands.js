@@ -37,12 +37,10 @@ excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
   Ex: excluir rifa  /  excluir rifa 2
 
 *Registrar vendas*
-<numero(s)> <nome do comprador> - forma rapida de registrar uma venda
-  Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva (varios numeros, mesmo comprador)
-vender <numero(s)> <nome> - mesma coisa, por extenso
-  Ex: vender 23 Joao Silva  /  vender 1,2,3 Joao Silva
-Varias linhas - uma venda por linha, compradores diferentes:
-  10 Maria
+vender <numero(s)> <nome> - registra uma venda (precisa comecar com "vender")
+  Ex: vender 23 Joao Silva  /  vender 1,2,3 Joao Silva (varios numeros, mesmo comprador)
+vender <numero> <nome>, uma por linha - compradores diferentes numa so mensagem:
+  vender 10 Maria
   11 Joao
   12 Kaio
 desfazer <numero(s)> - libera de novo numero(s) vendido(s) por engano
@@ -254,16 +252,6 @@ export function handleCommand(rawText) {
     return `Oi! Estou online. Mande "ajuda" para ver os comandos.`;
   }
 
-  const multilineSales = parseMultilineSales(text);
-  if (multilineSales) {
-    return sellFromLines(multilineSales);
-  }
-
-  const shorthandSale = parseSaleArgs(text);
-  if (shorthandSale) {
-    return sellMultiple(shorthandSale.numbers, shorthandSale.buyer);
-  }
-
   const tokens = text.split(/\s+/);
   const [cmdRaw, ...rest] = tokens;
   const cmd = stripAccents(cmdRaw.toLowerCase().replace(/^\//, ''));
@@ -286,10 +274,19 @@ export function handleCommand(rawText) {
     }
 
     case 'vender': {
-      const saleArgs = parseSaleArgs(rest.join(' '));
-      if (!saleArgs) {
-        return 'Uso: vender <numero>[,<numero>,...] <nome do comprador>\n  Ex: vender 1,2,3 Joao Silva';
-      }
+      // Pega o texto original apos a palavra "vender", preservando quebras
+      // de linha (rest.join(' ') perderia isso, ja que veio de um split por
+      // espaco/quebra de linha).
+      const argsText = text.replace(/^\S+\s*/, '');
+      const usoVender =
+        'Uso: vender <numero(s)> <nome do comprador>\n  Ex: vender 1,2,3 Joao Silva\n' +
+        'ou varias linhas depois de "vender", uma venda por linha:\n  vender 10 Maria\n  11 Joao\n  12 Kaio';
+
+      const multiline = parseMultilineSales(argsText);
+      if (multiline) return sellFromLines(multiline);
+
+      const saleArgs = parseSaleArgs(argsText);
+      if (!saleArgs) return usoVender;
       return sellMultiple(saleArgs.numbers, saleArgs.buyer);
     }
 
