@@ -10,6 +10,7 @@ import {
   getSoldNumbers,
   deleteRaffle,
 } from './store.js';
+import { generateGridImage } from './grid-image.js';
 
 // Se configurado (BOT_NAME no .env), mandar so o nome do bot funciona como um
 // "ping" pra confirmar que ele esta online, sem precisar lembrar um comando.
@@ -36,7 +37,7 @@ desfazer <numero> - libera de novo um numero vendido por engano (igual "excluir 
 
 *Consultar*
 status <numero> - mostra se um numero especifico esta disponivel ou vendido
-disponiveis - lista todos os numeros que ainda restam pra vender
+disponiveis - manda uma imagem com todos os numeros, X nos ja vendidos
 vendidos - lista todos os numeros ja vendidos e para quem
 
 *Outros*
@@ -216,9 +217,11 @@ export function handleCommand(rawText) {
     case 'disponiveis': {
       const { raffle, error } = requireActive();
       if (error) return error;
-      const numbers = getAvailableNumbers(raffle.id);
-      const lista = numbers.length ? numbers.join(', ') : 'nenhum';
-      return `*${raffle.name}* - disponiveis: ${numbers.length}/${raffle.total}\n${lista}`;
+      const disponiveis = getAvailableNumbers(raffle.id).length;
+      return {
+        image: generateGridImage(raffle),
+        caption: `*${raffle.name}*\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
+      };
     }
 
     case 'vendidos': {

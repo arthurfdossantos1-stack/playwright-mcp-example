@@ -177,7 +177,11 @@ async function processMessage(sock, msg) {
   if (!reply) return;
 
   try {
-    await sendChunked(sock, remoteJid, reply);
+    if (typeof reply === 'string') {
+      await sendChunked(sock, remoteJid, reply);
+    } else if (reply.image) {
+      await sock.sendMessage(remoteJid, { image: reply.image, caption: reply.caption });
+    }
     console.log(`[enviado] resposta enviada com sucesso para ${remoteJid}`);
   } catch (err) {
     console.error(`[erro ao enviar] nao consegui responder para ${remoteJid}:`, err?.message || err);
