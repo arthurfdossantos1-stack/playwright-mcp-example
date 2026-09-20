@@ -121,11 +121,17 @@ function getText(msg) {
   return m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || null;
 }
 
+// Guarda a chave da ultima mensagem que o bot mandou em cada conversa, para
+// o comando "apagar" poder revoga-la (delete for everyone).
+const lastSentMessageKey = new Map();
+
 async function sendChunked(sock, jid, text) {
   const MAX_LEN = 3500;
+  let sent;
   for (let i = 0; i < text.length; i += MAX_LEN) {
-    await sock.sendMessage(jid, { text: text.slice(i, i + MAX_LEN) });
+    sent = await sock.sendMessage(jid, { text: text.slice(i, i + MAX_LEN) });
   }
+  return sent;
 }
 
 async function processMessage(sock, msg) {
@@ -178,9 +184,19 @@ async function processMessage(sock, msg) {
 
   try {
     if (typeof reply === 'string') {
-      await sendChunked(sock, remoteJid, reply);
+      const sent = await sendChunked(sock, remoteJid, reply);
+      if (sent) lastSentMessageKey.set(remoteJid, sent.key);
     } else if (reply.image) {
-      await sock.sendMessage(remoteJid, { image: reply.image, caption: reply.caption });
+      const sent = await sock.sendMessage(remoteJid, { image: reply.image, caption: reply.caption });
+      lastSentMessageKey.set(remoteJid, sent.key);
+    } else if (reply.action === 'delete_last') {
+      const key = lastSentMessageKey.get(remoteJid);
+      if (key) {
+        await sock.sendMessage(remoteJid, { delete: key });
+        lastSentMessageKey.delete(remoteJid);
+      } else {
+        await sendChunked(sock, remoteJid, 'Nao tenho nenhuma mensagem recente pra apagar aqui.');
+      }
     }
     console.log(`[enviado] resposta enviada com sucesso para ${remoteJid}`);
   } catch (err) {

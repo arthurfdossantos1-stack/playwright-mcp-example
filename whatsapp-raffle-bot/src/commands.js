@@ -17,6 +17,14 @@ import { generateGridImage } from './grid-image.js';
 // "ping" pra confirmar que ele esta online, sem precisar lembrar um comando.
 const BOT_NAME = (process.env.BOT_NAME || '').trim();
 
+// Dados do PIX que o comando "pix" devolve. PIX_MESSAGE, se preenchido,
+// substitui totalmente o texto padrao montado a partir dos outros campos.
+const PIX_KEY = (process.env.PIX_KEY || '').trim();
+const PIX_NAME = (process.env.PIX_NAME || '').trim();
+const PIX_BANK = (process.env.PIX_BANK || '').trim();
+// "\n" digitado no .env vira quebra de linha de verdade aqui.
+const PIX_MESSAGE = (process.env.PIX_MESSAGE || '').trim().replace(/\\n/g, '\n');
+
 const HELP = `*Bot de Rifa - Comandos*
 
 *Criar e escolher a rifa*
@@ -30,9 +38,13 @@ excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
 
 *Registrar vendas*
 <numero(s)> <nome do comprador> - forma rapida de registrar uma venda
-  Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva (varios numeros de uma vez)
+  Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva (varios numeros, mesmo comprador)
 vender <numero(s)> <nome> - mesma coisa, por extenso
   Ex: vender 23 Joao Silva  /  vender 1,2,3 Joao Silva
+Varias linhas - uma venda por linha, compradores diferentes:
+  10 Maria
+  11 Joao
+  12 Kaio
 desfazer <numero(s)> - libera de novo numero(s) vendido(s) por engano
   (igual "excluir <numero(s)>" e "desmarcar <numero(s)>")
   Ex: desfazer 23  /  desfazer 1,2,3  /  desfazer todos (libera a rifa toda)
@@ -43,6 +55,8 @@ disponiveis - manda uma imagem com todos os numeros, X nos ja vendidos
 vendidos - lista todos os numeros ja vendidos e para quem
 
 *Outros*
+pix - mostra os dados de pagamento configurados
+apagar - apaga a ultima mensagem que o bot mandou aqui
 ajuda - mostra esta mensagem${BOT_NAME ? `\nmandar so "${BOT_NAME}" - confirma que o bot esta online` : ''}
 
 Os comandos funcionam com ou sem acento e em qualquer combinacao de
@@ -122,6 +136,58 @@ function sellMultiple(numbers, buyer) {
   return partes.join('\n');
 }
 
+// Reconhece varias linhas, cada uma "<numero(s)> <nome>", permitindo
+// compradores diferentes por numero, ex:
+//   10 Maria
+//   11 Joao
+//   12 Kaio
+// Retorna null se nao houver pelo menos 2 linhas ou se alguma nao for uma
+// venda valida (nesse caso quem chamou trata como outra coisa).
+function parseMultilineSales(text) {
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const sales = [];
+  for (const line of lines) {
+    const saleArgs = parseSaleArgs(line);
+    if (!saleArgs) return null;
+    sales.push(saleArgs);
+  }
+  return sales;
+}
+
+function sellFromLines(sales) {
+  const { raffle, error } = requireActive();
+  if (error) return error;
+
+  const vendidos = [];
+  const falhas = [];
+  for (const { numbers, buyer } of sales) {
+    for (const numero of numbers) {
+      const result = sellNumber(raffle.id, numero, buyer);
+      if (result.ok) {
+        vendidos.push(`${numero} - ${buyer}`);
+      } else if (result.reason === 'fora_do_intervalo') {
+        falhas.push(`${numero} (fora do intervalo, 1 a ${raffle.total})`);
+      } else if (result.reason === 'ja_vendido') {
+        falhas.push(`${numero} (ja vendido para ${result.buyer})`);
+      } else {
+        falhas.push(`${numero} (erro ao registrar)`);
+      }
+    }
+  }
+
+  const partes = [];
+  if (vendidos.length > 0) partes.push(`Registrado:\n${vendidos.join('\n')}`);
+  if (falhas.length > 0) partes.push(`Nao deu pra registrar: ${falhas.join(', ')}.`);
+  const remaining = getAvailableNumbers(raffle.id).length;
+  partes.push(`Restam ${remaining}/${raffle.total} numeros.`);
+  return partes.join('\n');
+}
+
 function undoMultiple(numbers) {
   const { raffle, error } = requireActive();
   if (error) return error;
@@ -186,6 +252,11 @@ export function handleCommand(rawText) {
 
   if (BOT_NAME && stripAccents(text.toLowerCase()) === stripAccents(BOT_NAME.toLowerCase())) {
     return `Oi! Estou online. Mande "ajuda" para ver os comandos.`;
+  }
+
+  const multilineSales = parseMultilineSales(text);
+  if (multilineSales) {
+    return sellFromLines(multilineSales);
   }
 
   const shorthandSale = parseSaleArgs(text);
@@ -281,6 +352,20 @@ export function handleCommand(rawText) {
       const ok = setActiveRaffle(id);
       return ok ? `Rifa ${id} agora esta ativa.` : `Nao encontrei nenhuma rifa com id ${id}.`;
     }
+
+    case 'pix': {
+      if (PIX_MESSAGE) return PIX_MESSAGE;
+      if (!PIX_KEY) {
+        return 'Chave PIX ainda nao configurada. Preencha PIX_KEY (e opcionalmente PIX_NAME, PIX_BANK) no .env.';
+      }
+      const linhas = ['*Dados para pagamento (PIX)*', `Chave: ${PIX_KEY}`];
+      if (PIX_NAME) linhas.push(`Nome: ${PIX_NAME}`);
+      if (PIX_BANK) linhas.push(`Banco: ${PIX_BANK}`);
+      return linhas.join('\n');
+    }
+
+    case 'apagar':
+      return { action: 'delete_last' };
 
     default:
       // Mensagem comum (tipo "oi", papo aleatorio) nao e comando: fica em

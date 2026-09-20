@@ -32,18 +32,28 @@ Mensagens comuns, tipo "oi" ou papo aleatório, ficam sem resposta.
 nova <quantidade> [nome]        cria uma rifa nova (fica ativa). Ex: nova 500 Rifa de Pascoa
 <numero(s)> <nome do comprador>  registra venda(s). Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva
 vender <numero(s)> <nome>       mesma coisa, forma explicita
-excluir <numero>                 libera um numero vendido por engano (igual "desfazer")
+                                 varias linhas tambem funciona, uma venda por linha:
+                                   10 Maria
+                                   11 Joao
+                                   12 Kaio
+excluir/desfazer/desmarcar <numero(s)>   libera numero(s) vendido(s) por engano
+excluir/desfazer/desmarcar todos          libera TODOS os numeros vendidos da rifa ativa
 excluir rifa [id]                apaga uma rifa inteira (sem id, apaga a rifa ativa)
 status <numero>                  consulta um numero especifico
 disponiveis                      manda uma imagem com todos os numeros, X nos ja vendidos
 vendidos                         lista em texto os numeros vendidos e para quem
 rifas                            lista todas as rifas ja criadas
 usar <id>                        troca qual rifa esta ativa
+pix                              mostra os dados de pagamento configurados no .env
+apagar                           apaga a ultima mensagem que o bot mandou naquele chat
 ajuda                            mostra o menu de comandos
 
 autorizar grupo                  (dentro de um grupo, so o dono) libera os comandos ali
 desautorizar grupo               (dentro de um grupo, so o dono) remove a permissao
 ```
+
+Pra usar o comando `pix`, preencha `PIX_KEY` (e opcionalmente `PIX_NAME`, `PIX_BANK`) no `.env` —
+ou `PIX_MESSAGE` se quiser controlar o texto inteiro. Veja o `.env.example`.
 
 Os comandos funcionam com ou sem acento e em qualquer combinação de maiúsculas/minúsculas
 (`disponiveis`, `disponíveis`, `DISPONÍVEIS` — todos funcionam igual).
