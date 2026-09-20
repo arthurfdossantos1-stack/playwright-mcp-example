@@ -1,5 +1,9 @@
 ## Cloudflare Playwright MCP Example
 
+> Este repositório também contém, na pasta [`whatsapp-raffle-bot/`](./whatsapp-raffle-bot), um
+> bot de WhatsApp (não oficial, via Baileys) para controlar a venda de números de rifa,
+> pensado para rodar no Termux.
+
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/playwright-mcp/tree/main/cloudflare/example)
 
 ### Overview

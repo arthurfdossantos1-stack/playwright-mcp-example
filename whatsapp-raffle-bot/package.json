@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-raffle-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bot de WhatsApp (nao oficial, via Baileys) para controlar numeros de rifa",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.24",
+    "pino": "^9.3.1",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
