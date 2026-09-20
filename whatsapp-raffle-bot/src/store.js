@@ -77,6 +77,16 @@ export function setActiveRaffle(id) {
   return true;
 }
 
+export function deleteRaffle(id) {
+  const state = load();
+  const raffle = state.raffles[id];
+  if (!raffle) return { ok: false };
+  delete state.raffles[id];
+  if (state.activeRaffleId === id) state.activeRaffleId = null;
+  save(state);
+  return { ok: true, raffle };
+}
+
 export function getRaffle(id) {
   const state = load();
   return state.raffles[id] || null;

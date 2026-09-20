@@ -8,6 +8,7 @@ import {
   getNumberStatus,
   getAvailableNumbers,
   getSoldNumbers,
+  deleteRaffle,
 } from './store.js';
 
 // Se configurado (BOT_NAME no .env), mandar so o nome do bot funciona como um
@@ -22,13 +23,15 @@ nova <quantidade> [nome] - cria uma rifa nova e ja deixa ela ativa
 rifas - lista todas as rifas ja criadas e quantos numeros cada uma vendeu
 usar <id> - troca qual rifa fica ativa (se voce tiver mais de uma)
   Ex: usar 2
+excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
+  Ex: excluir rifa  /  excluir rifa 2
 
 *Registrar vendas*
 <numero> <nome do comprador> - forma rapida de registrar uma venda
   Ex: 23 Joao Silva
 vender <numero> <nome> - mesma coisa, por extenso
   Ex: vender 23 Joao Silva
-desfazer <numero> - libera de novo um numero vendido por engano
+desfazer <numero> - libera de novo um numero vendido por engano (igual "excluir <numero>")
   Ex: desfazer 23
 
 *Consultar*
@@ -75,6 +78,33 @@ function sell(numero, buyer) {
   }
   const remaining = getAvailableNumbers(raffle.id).length;
   return `Registrado: numero ${numero} vendido para ${buyer}.\nRestam ${remaining}/${raffle.total} numeros.`;
+}
+
+function undoNumberCommand(numero) {
+  if (!Number.isInteger(numero)) return 'Uso: excluir <numero>  (ou: desfazer <numero>)';
+  const { raffle, error } = requireActive();
+  if (error) return error;
+  const result = undoNumber(raffle.id, numero);
+  if (!result.ok) {
+    if (result.reason === 'fora_do_intervalo') return `O numero ${numero} nao existe nessa rifa.`;
+    if (result.reason === 'nao_vendido') return `O numero ${numero} ja esta disponivel.`;
+    return 'Nao foi possivel desfazer.';
+  }
+  return `Numero ${numero} liberado novamente.`;
+}
+
+function deleteRaffleCommand(id) {
+  let raffleId = id;
+  if (!raffleId) {
+    const { raffle, error } = requireActive();
+    if (error) return error;
+    raffleId = raffle.id;
+  }
+  const result = deleteRaffle(raffleId);
+  if (!result.ok) return `Nao encontrei nenhuma rifa com id ${raffleId}.`;
+  const sold = Object.values(result.raffle.numbers).filter((n) => n.status === 'vendido').length;
+  const aviso = sold > 0 ? ` Ela tinha ${sold} numero(s) vendido(s), que foram perdidos junto.` : '';
+  return `Rifa "${result.raffle.name}" (id ${raffleId}) excluida.${aviso}`;
 }
 
 export function handleCommand(rawText) {
@@ -125,18 +155,18 @@ export function handleCommand(rawText) {
       return sell(numero, buyer);
     }
 
-    case 'desfazer': {
-      const numero = Number(rest[0]);
-      if (!Number.isInteger(numero)) return 'Uso: desfazer <numero>';
-      const { raffle, error } = requireActive();
-      if (error) return error;
-      const result = undoNumber(raffle.id, numero);
-      if (!result.ok) {
-        if (result.reason === 'fora_do_intervalo') return `O numero ${numero} nao existe nessa rifa.`;
-        if (result.reason === 'nao_vendido') return `O numero ${numero} ja esta disponivel.`;
-        return 'Nao foi possivel desfazer.';
+    case 'desfazer':
+      return undoNumberCommand(Number(rest[0]));
+
+    case 'excluir': {
+      const [arg, ...restArgs] = rest;
+      if (!arg) {
+        return 'Uso: excluir <numero>  (libera um numero)\nou: excluir rifa [id]  (apaga uma rifa inteira)';
       }
-      return `Numero ${numero} liberado novamente.`;
+      if (stripAccents(arg.toLowerCase()) === 'rifa') {
+        return deleteRaffleCommand(restArgs[0]);
+      }
+      return undoNumberCommand(Number(arg));
     }
 
     case 'status': {
