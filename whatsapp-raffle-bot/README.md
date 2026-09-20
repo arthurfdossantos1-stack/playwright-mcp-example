@@ -96,6 +96,18 @@ ajuda                            mostra o menu de comandos
    - **QR code**: no WhatsApp do celular vá em `Configurações` → `Aparelhos conectados` →
      `Conectar um aparelho`, e escaneie o QR que apareceu no Termux. Nesse caso, só aperte
      Enter na pergunta do terminal sem digitar nada.
+
+     Se o desenho em texto do terminal ficar cortado/ilegível (comum em tela de celular), o bot
+     também salva o mesmo QR como imagem em `qr.png`, na pasta do projeto. Copie esse arquivo
+     para outro aparelho com câmera (celular, tablet, computador) e escaneie a imagem de lá —
+     por exemplo, com `termux-setup-storage` e depois:
+
+     ```bash
+     cp qr.png ~/storage/downloads/
+     ```
+
+     e abra o arquivo pela Galeria/Arquivos do Android numa tela maior, ou envie para outro
+     aparelho (e-mail, Bluetooth, etc.) para escanear de lá.
    - **Código de pareamento**: digite seu número (com DDI+DDD, só números) e aperte Enter. O
      terminal mostra um **código de 8 caracteres**. No WhatsApp: `Configurações` →
      `Aparelhos conectados` → `Conectar um aparelho` → `Conectar com número de telefone` (link

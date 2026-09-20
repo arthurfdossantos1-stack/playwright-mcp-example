@@ -10,11 +10,13 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
 import { handleCommand } from './commands.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR = path.join(__dirname, '..', 'auth_info');
 const ENV_FILE = path.join(__dirname, '..', '.env');
+const QR_IMAGE_PATH = path.join(__dirname, '..', 'qr.png');
 
 function loadEnvFile() {
   if (!fs.existsSync(ENV_FILE)) return;
@@ -135,6 +137,12 @@ async function start() {
     if (qr) {
       console.log('\nEscaneie o QR code no WhatsApp: Aparelhos conectados > Conectar um aparelho\n');
       qrcode.generate(qr, { small: true });
+      QRCode.toFile(QR_IMAGE_PATH, qr, { width: 512 })
+        .then(() => {
+          console.log(`\nSe o desenho acima nao escanear direito, o mesmo QR foi salvo como imagem em: ${QR_IMAGE_PATH}`);
+          console.log('Copie esse arquivo para outro aparelho (ou abra numa tela maior) e escaneie a imagem.\n');
+        })
+        .catch((err) => console.error('Nao consegui salvar o QR como imagem:', err?.message || err));
     }
 
     if (connection === 'close') {
