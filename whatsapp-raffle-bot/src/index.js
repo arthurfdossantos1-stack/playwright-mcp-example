@@ -14,6 +14,11 @@ import QRCode from 'qrcode';
 import { handleCommand } from './commands.js';
 import { isAuthorizedGroup, addAuthorizedGroup, removeAuthorizedGroup } from './groups.js';
 
+// A biblioteca de criptografia (libsignal) usa console.info diretamente para
+// avisos de rotina ("Closing session", "Opening session"...), ignorando o
+// nosso logger. Isso lota o terminal e esconde os logs que importam.
+console.info = () => {};
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR = path.join(__dirname, '..', 'auth_info');
 const ENV_FILE = path.join(__dirname, '..', '.env');
@@ -171,7 +176,12 @@ async function processMessage(sock, msg) {
   const reply = handleCommand(text);
   if (!reply) return;
 
-  await sendChunked(sock, remoteJid, reply);
+  try {
+    await sendChunked(sock, remoteJid, reply);
+    console.log(`[enviado] resposta enviada com sucesso para ${remoteJid}`);
+  } catch (err) {
+    console.error(`[erro ao enviar] nao consegui responder para ${remoteJid}:`, err?.message || err);
+  }
 }
 
 async function start() {
