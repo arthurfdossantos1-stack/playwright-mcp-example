@@ -45,13 +45,17 @@ ajuda                            mostra o menu de comandos
    node -v   # confira se é 18 ou mais novo
    ```
 
-3. Copie este projeto para o celular (git clone do seu repositório, ou transferindo a pasta
-   `whatsapp-raffle-bot/` por qualquer meio) e entre nela:
+3. Baixe o repositório direto do GitHub (troque a URL se o seu repositório for outro) e entre na
+   pasta do bot:
 
    ```bash
-   cd whatsapp-raffle-bot
+   git clone -b claude/whatsapp-raffle-bot-7chewp https://github.com/arthurfdossantos1-stack/playwright-mcp-example.git
+   cd playwright-mcp-example/whatsapp-raffle-bot
    npm install
    ```
+
+   Se o repositório for privado, o Git vai pedir usuário e senha — use um
+   [personal access token](https://github.com/settings/tokens) do GitHub no lugar da senha.
 
 4. Crie o arquivo de configuração:
 
