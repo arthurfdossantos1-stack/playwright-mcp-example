@@ -85,8 +85,24 @@ async function setupPairingCode(sock) {
   }
 }
 
+// O WhatsApp as vezes embrulha a mensagem de verdade dentro de outra (mensagem
+// efemera, "ver uma vez", ou repassada de outro aparelho seu). Desembrulha ate
+// achar o texto de fato.
+function unwrapMessage(message) {
+  if (!message) return message;
+  const wrapperKey = [
+    'ephemeralMessage',
+    'viewOnceMessage',
+    'viewOnceMessageV2',
+    'viewOnceMessageV2Extension',
+    'documentWithCaptionMessage',
+    'deviceSentMessage',
+  ].find((key) => message[key]?.message);
+  return wrapperKey ? unwrapMessage(message[wrapperKey].message) : message;
+}
+
 function getText(msg) {
-  const m = msg.message;
+  const m = unwrapMessage(msg.message);
   if (!m) return null;
   return m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || null;
 }
@@ -106,10 +122,13 @@ async function processMessage(sock, msg) {
   const ownJid = sock.user?.id ? normalizeJid(sock.user.id) : null;
   const isSelfChat = ownJid !== null && remoteJid === ownJid;
   const isFromAuthorizedNumber = !msg.key.fromMe && authorizedJids.includes(remoteJid);
+  const text = getText(msg);
+
+  console.log(
+    `[recebido] remoteJid=${remoteJid} fromMe=${msg.key.fromMe} ownJid=${ownJid} autorizado=${isSelfChat || isFromAuthorizedNumber} texto=${JSON.stringify(text)}`
+  );
 
   if (!isSelfChat && !isFromAuthorizedNumber) return;
-
-  const text = getText(msg);
   if (!text) return;
 
   const reply = handleCommand(text);
