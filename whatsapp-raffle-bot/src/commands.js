@@ -21,7 +21,10 @@ disponiveis - mostra quantos e quais numeros restam
 vendidos - mostra os numeros ja vendidos e para quem
 rifas - lista todas as rifas criadas
 usar <id> - troca qual rifa esta ativa
-ajuda - mostra esta mensagem`;
+ajuda - mostra esta mensagem
+
+*Em grupos:* mande "autorizar grupo" dentro do grupo (so voce, dono do bot,
+consegue) para liberar os comandos ali. "desautorizar grupo" remove.`;
 
 function compressRanges(numbers) {
   if (numbers.length === 0) return 'nenhum';

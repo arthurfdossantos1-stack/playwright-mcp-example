@@ -17,6 +17,12 @@ Você conversa com **você mesmo** no WhatsApp (função "Mensagens para você" 
 número/nome no WhatsApp) e manda comandos. Se quiser que outras pessoas também possam registrar
 vendas direto no número do bot, coloque os números delas em `AUTHORIZED_NUMBERS` no `.env`.
 
+Também dá pra usar em **grupos específicos** (por exemplo, um grupo com quem está vendendo os
+números da rifa): entre no grupo e mande, de dentro dele, `autorizar grupo` — só funciona quando
+é você (dono do bot) mandando. A partir daí, qualquer mensagem naquele grupo é lida como comando
+(`23 João Silva`, `disponiveis`, etc.), igual ao chat pessoal. Pra tirar a permissão, mande
+`desautorizar grupo`. Outros grupos que você participa continuam ignorados normalmente.
+
 ### Comandos
 
 ```
@@ -30,6 +36,9 @@ vendidos                         mostra os numeros vendidos e para quem
 rifas                            lista todas as rifas ja criadas
 usar <id>                        troca qual rifa esta ativa
 ajuda                            mostra o menu de comandos
+
+autorizar grupo                  (dentro de um grupo, so o dono) libera os comandos ali
+desautorizar grupo               (dentro de um grupo, so o dono) remove a permissao
 ```
 
 ## Instalação no Termux

@@ -12,6 +12,7 @@ import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import QRCode from 'qrcode';
 import { handleCommand } from './commands.js';
+import { isAuthorizedGroup, addAuthorizedGroup, removeAuthorizedGroup } from './groups.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_DIR = path.join(__dirname, '..', 'auth_info');
@@ -42,6 +43,14 @@ const authorizedJids = (process.env.AUTHORIZED_NUMBERS || '')
 
 function normalizeJid(jid) {
   return jid.split(':')[0] + '@s.whatsapp.net';
+}
+
+// O WhatsApp vem migrando as conversas (incluindo a de "mensagens para voce")
+// para um identificador @lid em vez do numero de telefone. sock.user.lid traz
+// esse identificador equivalente ao seu proprio numero.
+function normalizeLid(lid) {
+  const user = lid.split('@')[0].split(':')[0];
+  return `${user}@lid`;
 }
 
 function ask(question) {
@@ -119,16 +128,44 @@ async function processMessage(sock, msg) {
   const remoteJid = msg.key.remoteJid;
   if (!remoteJid || remoteJid === 'status@broadcast') return;
 
-  const ownJid = sock.user?.id ? normalizeJid(sock.user.id) : null;
-  const isSelfChat = ownJid !== null && remoteJid === ownJid;
-  const isFromAuthorizedNumber = !msg.key.fromMe && authorizedJids.includes(remoteJid);
+  const isGroup = remoteJid.endsWith('@g.us');
   const text = getText(msg);
 
+  // So o dono do bot (fromMe, ou seja, mandado do proprio WhatsApp dele) pode
+  // autorizar ou remover um grupo, mandando a mensagem dentro do grupo.
+  if (isGroup && msg.key.fromMe && text) {
+    const normalized = text.trim().toLowerCase();
+    if (normalized === 'autorizar grupo') {
+      const added = addAuthorizedGroup(remoteJid);
+      await sendChunked(
+        sock,
+        remoteJid,
+        added ? 'Grupo autorizado! Agora da pra usar os comandos da rifa aqui.' : 'Esse grupo ja estava autorizado.'
+      );
+      return;
+    }
+    if (normalized === 'desautorizar grupo') {
+      const removed = removeAuthorizedGroup(remoteJid);
+      await sendChunked(
+        sock,
+        remoteJid,
+        removed ? 'Grupo desautorizado.' : 'Esse grupo nao estava autorizado.'
+      );
+      return;
+    }
+  }
+
+  const ownJid = sock.user?.id ? normalizeJid(sock.user.id) : null;
+  const ownLid = sock.user?.lid ? normalizeLid(sock.user.lid) : null;
+  const isSelfChat = (ownJid !== null && remoteJid === ownJid) || (ownLid !== null && remoteJid === ownLid);
+  const isFromAuthorizedNumber = !isGroup && !msg.key.fromMe && authorizedJids.includes(remoteJid);
+  const isGroupAllowed = isGroup && isAuthorizedGroup(remoteJid);
+
   console.log(
-    `[recebido] remoteJid=${remoteJid} fromMe=${msg.key.fromMe} ownJid=${ownJid} autorizado=${isSelfChat || isFromAuthorizedNumber} texto=${JSON.stringify(text)}`
+    `[recebido] remoteJid=${remoteJid} fromMe=${msg.key.fromMe} autorizado=${isSelfChat || isFromAuthorizedNumber || isGroupAllowed} texto=${JSON.stringify(text)}`
   );
 
-  if (!isSelfChat && !isFromAuthorizedNumber) return;
+  if (!isSelfChat && !isFromAuthorizedNumber && !isGroupAllowed) return;
   if (!text) return;
 
   const reply = handleCommand(text);
