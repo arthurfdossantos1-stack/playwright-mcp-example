@@ -67,6 +67,9 @@ ajuda                            mostra o menu de comandos
    e preencha `AUTHORIZED_NUMBERS` (DDI+DDD+número, só dígitos, separado por vírgula). Isso é
    opcional — falar com você mesmo sempre funciona, mesmo com o `.env` vazio.
 
+   Também dá pra preencher `PAIRING_NUMBER` com o seu próprio número, se quiser que o bot já
+   gere o código de pareamento direto ao iniciar (veja o passo 7).
+
 5. Evite que o Android mate o processo enquanto o Termux estiver em segundo plano:
 
    ```bash
@@ -82,8 +85,24 @@ ajuda                            mostra o menu de comandos
    npm start
    ```
 
-7. Vai aparecer um **QR code** no terminal. No WhatsApp do celular: `Configurações` →
-   `Aparelhos conectados` → `Conectar um aparelho`, e escaneie o QR.
+7. Vai aparecer um **QR code** no terminal e, logo abaixo, uma pergunta:
+
+   ```
+   Digite seu numero com DDI+DDD, so numeros (ex: 5511999999999), ou aperte Enter para usar so o QR:
+   ```
+
+   Você escolhe **um dos dois** jeitos de conectar:
+
+   - **QR code**: no WhatsApp do celular vá em `Configurações` → `Aparelhos conectados` →
+     `Conectar um aparelho`, e escaneie o QR que apareceu no Termux. Nesse caso, só aperte
+     Enter na pergunta do terminal sem digitar nada.
+   - **Código de pareamento**: digite seu número (com DDI+DDD, só números) e aperte Enter. O
+     terminal mostra um **código de 8 caracteres**. No WhatsApp: `Configurações` →
+     `Aparelhos conectados` → `Conectar um aparelho` → `Conectar com número de telefone` (link
+     embaixo da tela do QR) e digite o código.
+
+   Se preferir não responder nada toda vez, preencha `PAIRING_NUMBER` no `.env` (passo 4) — o
+   bot já pede o código de pareamento direto ao iniciar, sem perguntar no terminal.
 
 8. Depois de conectar, abra uma conversa com você mesmo no WhatsApp e mande `ajuda` para ver o
    bot respondendo.

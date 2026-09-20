@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { fileURLToPath } from 'url';
 import makeWASocket, {
   useMultiFileAuthState,
@@ -39,6 +40,47 @@ const authorizedJids = (process.env.AUTHORIZED_NUMBERS || '')
 
 function normalizeJid(jid) {
   return jid.split(':')[0] + '@s.whatsapp.net';
+}
+
+function ask(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+// Guarda a escolha (numero ou "so QR") feita na primeira tentativa de conexao,
+// para nao ficar perguntando de novo a cada reconexao automatica.
+let pairingChoiceMade = false;
+let pairingPhoneNumber = '';
+
+async function setupPairingCode(sock) {
+  if (!pairingChoiceMade) {
+    pairingPhoneNumber = (process.env.PAIRING_NUMBER || '').replace(/\D/g, '');
+    if (!pairingPhoneNumber) {
+      console.log('\nAlem do QR code, da para conectar por CODIGO DE PAREAMENTO (sem escanear nada).');
+      const answer = await ask(
+        'Digite seu numero com DDI+DDD, so numeros (ex: 5511999999999), ou aperte Enter para usar so o QR: '
+      );
+      pairingPhoneNumber = answer.replace(/\D/g, '');
+    }
+    pairingChoiceMade = true;
+  }
+
+  if (!pairingPhoneNumber) return;
+
+  try {
+    const code = await sock.requestPairingCode(pairingPhoneNumber);
+    console.log(`\nCodigo de pareamento: ${code}`);
+    console.log(
+      'No WhatsApp: Aparelhos conectados > Conectar um aparelho > "Conectar com numero de telefone" e digite esse codigo.\n'
+    );
+  } catch (err) {
+    console.error('Nao foi possivel gerar o codigo de pareamento:', err?.message || err);
+  }
 }
 
 function getText(msg) {
@@ -120,6 +162,10 @@ async function start() {
       }
     }
   });
+
+  if (!state.creds.registered) {
+    await setupPairingCode(sock);
+  }
 }
 
 start().catch((err) => {
