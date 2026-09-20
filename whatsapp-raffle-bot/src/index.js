@@ -179,7 +179,7 @@ async function processMessage(sock, msg) {
   if (!isSelfChat && !isFromAuthorizedNumber && !isGroupAllowed) return;
   if (!text) return;
 
-  const reply = handleCommand(text);
+  const reply = await handleCommand(text);
   if (!reply) return;
 
   try {

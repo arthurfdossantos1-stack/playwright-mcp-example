@@ -12,6 +12,7 @@ import {
   resetAllNumbers,
 } from './store.js';
 import { generateGridImage } from './grid-image.js';
+import { generateGridImageWithHeader } from './grid-image-header.js';
 
 // Se configurado (BOT_NAME no .env), mandar so o nome do bot funciona como um
 // "ping" pra confirmar que ele esta online, sem precisar lembrar um comando.
@@ -50,6 +51,8 @@ desfazer <numero(s)> - libera de novo numero(s) vendido(s) por engano
 *Consultar*
 status <numero> - mostra se um numero especifico esta disponivel ou vendido
 disponiveis - manda uma imagem com todos os numeros, X nos ja vendidos
+disponiveis2 <valor> <data> - (teste) igual "disponiveis", com titulo em cima
+  Ex: disponiveis2 5,00 20/10/2026
 vendidos - lista todos os numeros ja vendidos e para quem
 
 *Outros*
@@ -244,7 +247,7 @@ function deleteRaffleCommand(id) {
   return `Rifa "${result.raffle.name}" (id ${raffleId}) excluida.${aviso}`;
 }
 
-export function handleCommand(rawText) {
+export async function handleCommand(rawText) {
   const text = rawText.trim();
   if (!text) return null;
 
@@ -323,6 +326,24 @@ export function handleCommand(rawText) {
       return {
         image: generateGridImage(raffle),
         caption: `*${raffle.name}*\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
+      };
+    }
+
+    // Comando de teste: mesma coisa do "disponiveis", mas com uma faixa de
+    // titulo em cima (nome, valor por numero, data do sorteio). Nao mexe no
+    // "disponiveis" de verdade.
+    case 'disponiveis2': {
+      const [valor, ...dataParts] = rest;
+      const data = dataParts.join(' ');
+      if (!valor || !data) {
+        return 'Uso (teste): disponiveis2 <valor> <data do sorteio>\n  Ex: disponiveis2 5,00 20/10/2026';
+      }
+      const { raffle, error } = requireActive();
+      if (error) return error;
+      const disponiveis = getAvailableNumbers(raffle.id).length;
+      return {
+        image: await generateGridImageWithHeader(raffle, valor, data),
+        caption: `*${raffle.name}* (teste com titulo)\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
       };
     }
 
