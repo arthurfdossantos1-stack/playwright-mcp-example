@@ -9,6 +9,7 @@ import {
   getAvailableNumbers,
   getSoldNumbers,
   deleteRaffle,
+  resetAllNumbers,
 } from './store.js';
 import { generateGridImage } from './grid-image.js';
 
@@ -32,8 +33,9 @@ excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
   Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva (varios numeros de uma vez)
 vender <numero(s)> <nome> - mesma coisa, por extenso
   Ex: vender 23 Joao Silva  /  vender 1,2,3 Joao Silva
-desfazer <numero> - libera de novo um numero vendido por engano (igual "excluir <numero>")
-  Ex: desfazer 23
+desfazer <numero(s)> - libera de novo numero(s) vendido(s) por engano
+  (igual "excluir <numero(s)>" e "desmarcar <numero(s)>")
+  Ex: desfazer 23  /  desfazer 1,2,3  /  desfazer todos (libera a rifa toda)
 
 *Consultar*
 status <numero> - mostra se um numero especifico esta disponivel ou vendido
@@ -120,17 +122,48 @@ function sellMultiple(numbers, buyer) {
   return partes.join('\n');
 }
 
-function undoNumberCommand(numero) {
-  if (!Number.isInteger(numero)) return 'Uso: excluir <numero>  (ou: desfazer <numero>)';
+function undoMultiple(numbers) {
   const { raffle, error } = requireActive();
   if (error) return error;
-  const result = undoNumber(raffle.id, numero);
-  if (!result.ok) {
-    if (result.reason === 'fora_do_intervalo') return `O numero ${numero} nao existe nessa rifa.`;
-    if (result.reason === 'nao_vendido') return `O numero ${numero} ja esta disponivel.`;
-    return 'Nao foi possivel desfazer.';
+
+  const liberados = [];
+  const falhas = [];
+  for (const numero of numbers) {
+    const result = undoNumber(raffle.id, numero);
+    if (result.ok) {
+      liberados.push(numero);
+    } else if (result.reason === 'fora_do_intervalo') {
+      falhas.push(`${numero} (fora do intervalo, 1 a ${raffle.total})`);
+    } else if (result.reason === 'nao_vendido') {
+      falhas.push(`${numero} (ja estava disponivel)`);
+    } else {
+      falhas.push(`${numero} (erro)`);
+    }
   }
-  return `Numero ${numero} liberado novamente.`;
+
+  const partes = [];
+  if (liberados.length > 0) partes.push(`Liberado(s): ${liberados.join(', ')}.`);
+  if (falhas.length > 0) partes.push(`Nao deu pra liberar: ${falhas.join(', ')}.`);
+  return partes.join('\n');
+}
+
+function resetAllCommand() {
+  const { raffle, error } = requireActive();
+  if (error) return error;
+  const result = resetAllNumbers(raffle.id);
+  if (result.count === 0) return `*${raffle.name}* - nenhum numero estava vendido.`;
+  return `*${raffle.name}* - ${result.count} numero(s) desmarcado(s). Todos voltaram a ficar disponiveis.`;
+}
+
+// Trata "<numero(s)>" ou "todos" depois de desfazer/excluir/desmarcar.
+function undoArgsCommand(rest, cmdName) {
+  const argText = rest.join(' ').trim();
+  const uso = `Uso: ${cmdName} <numero(s)>  ou  ${cmdName} todos`;
+  if (!argText) return uso;
+  if (stripAccents(argText.toLowerCase()) === 'todos') return resetAllCommand();
+  const numbers = parseNumberList(argText);
+  if (!numbers) return uso;
+  return undoMultiple(numbers);
 }
 
 function deleteRaffleCommand(id) {
@@ -190,17 +223,18 @@ export function handleCommand(rawText) {
     }
 
     case 'desfazer':
-      return undoNumberCommand(Number(rest[0]));
+    case 'desmarcar':
+      return undoArgsCommand(rest, cmd);
 
     case 'excluir': {
       const [arg, ...restArgs] = rest;
       if (!arg) {
-        return 'Uso: excluir <numero>  (libera um numero)\nou: excluir rifa [id]  (apaga uma rifa inteira)';
+        return 'Uso: excluir <numero(s)>  ou  excluir todos\nou: excluir rifa [id]  (apaga uma rifa inteira)';
       }
       if (stripAccents(arg.toLowerCase()) === 'rifa') {
         return deleteRaffleCommand(restArgs[0]);
       }
-      return undoNumberCommand(Number(arg));
+      return undoArgsCommand(rest, 'excluir');
     }
 
     case 'status': {

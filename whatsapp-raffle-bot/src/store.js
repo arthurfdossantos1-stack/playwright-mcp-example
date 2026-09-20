@@ -92,6 +92,23 @@ export function getRaffle(id) {
   return state.raffles[id] || null;
 }
 
+export function resetAllNumbers(id) {
+  const state = load();
+  const raffle = state.raffles[id];
+  if (!raffle) return { ok: false };
+  let count = 0;
+  for (const entry of Object.values(raffle.numbers)) {
+    if (entry.status === 'vendido') {
+      entry.status = 'disponivel';
+      delete entry.buyer;
+      delete entry.soldAt;
+      count++;
+    }
+  }
+  save(state);
+  return { ok: true, count };
+}
+
 export function sellNumber(raffleId, number, buyer) {
   const state = load();
   const raffle = state.raffles[raffleId];
