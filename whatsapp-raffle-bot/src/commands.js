@@ -10,21 +10,42 @@ import {
   getSoldNumbers,
 } from './store.js';
 
-const HELP = `*Comandos do bot de rifa*
+// Se configurado (BOT_NAME no .env), mandar so o nome do bot funciona como um
+// "ping" pra confirmar que ele esta online, sem precisar lembrar um comando.
+const BOT_NAME = (process.env.BOT_NAME || '').trim();
 
-nova <quantidade> [nome] - cria uma rifa nova (fica ativa)
-<numero> <nome do comprador> - registra uma venda, ex: 23 Joao Silva
-vender <numero> <nome> - mesma coisa, forma explicita
-desfazer <numero> - libera um numero vendido por engano
-status <numero> - consulta um numero
-disponiveis - mostra quantos e quais numeros restam
-vendidos - mostra os numeros ja vendidos e para quem
-rifas - lista todas as rifas criadas
-usar <id> - troca qual rifa esta ativa
-ajuda - mostra esta mensagem
+const HELP = `*Bot de Rifa - Comandos*
 
-*Em grupos:* mande "autorizar grupo" dentro do grupo (so voce, dono do bot,
-consegue) para liberar os comandos ali. "desautorizar grupo" remove.`;
+*Criar e escolher a rifa*
+nova <quantidade> [nome] - cria uma rifa nova e ja deixa ela ativa
+  Ex: nova 500 Rifa de Natal
+rifas - lista todas as rifas ja criadas e quantos numeros cada uma vendeu
+usar <id> - troca qual rifa fica ativa (se voce tiver mais de uma)
+  Ex: usar 2
+
+*Registrar vendas*
+<numero> <nome do comprador> - forma rapida de registrar uma venda
+  Ex: 23 Joao Silva
+vender <numero> <nome> - mesma coisa, por extenso
+  Ex: vender 23 Joao Silva
+desfazer <numero> - libera de novo um numero vendido por engano
+  Ex: desfazer 23
+
+*Consultar*
+status <numero> - mostra se um numero especifico esta disponivel ou vendido
+disponiveis - lista todos os numeros que ainda restam pra vender
+vendidos - lista todos os numeros ja vendidos e para quem
+
+*Outros*
+ajuda - mostra esta mensagem${BOT_NAME ? `\nmandar so "${BOT_NAME}" - confirma que o bot esta online` : ''}
+
+Os comandos funcionam com ou sem acento e em qualquer combinacao de
+maiuscula/minuscula (disponiveis = disponíveis = DISPONÍVEIS). O bot so
+responde a comandos - mensagem solta tipo "oi" fica sem resposta.
+
+*Em grupos:* mande "autorizar grupo" de dentro do grupo (so funciona vindo de
+voce, dono do bot) para liberar os comandos ali. "desautorizar grupo" remove
+a permissao. Outros grupos continuam sendo ignorados.`;
 
 function stripAccents(text) {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -59,6 +80,10 @@ function sell(numero, buyer) {
 export function handleCommand(rawText) {
   const text = rawText.trim();
   if (!text) return null;
+
+  if (BOT_NAME && stripAccents(text.toLowerCase()) === stripAccents(BOT_NAME.toLowerCase())) {
+    return `Oi! Estou online. Mande "ajuda" para ver os comandos.`;
+  }
 
   const tokens = text.split(/\s+/);
   const firstAsNumber = Number(tokens[0]);
@@ -158,6 +183,8 @@ export function handleCommand(rawText) {
     }
 
     default:
-      return `Nao entendi "${cmdRaw}". Mande "ajuda" para ver os comandos.`;
+      // Mensagem comum (tipo "oi", papo aleatorio) nao e comando: fica em
+      // silencio em vez de responder qualquer coisa que passar pelo bot.
+      return null;
   }
 }

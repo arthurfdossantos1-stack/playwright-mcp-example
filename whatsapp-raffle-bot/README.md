@@ -23,6 +23,9 @@ números da rifa): entre no grupo e mande, de dentro dele, `autorizar grupo` —
 (`23 João Silva`, `disponiveis`, etc.), igual ao chat pessoal. Pra tirar a permissão, mande
 `desautorizar grupo`. Outros grupos que você participa continuam ignorados normalmente.
 
+O bot só responde a comandos reconhecidos (e ao nome dele, se configurado — veja abaixo).
+Mensagens comuns, tipo "oi" ou papo aleatório, ficam sem resposta.
+
 ### Comandos
 
 ```
@@ -40,6 +43,14 @@ ajuda                            mostra o menu de comandos
 autorizar grupo                  (dentro de um grupo, so o dono) libera os comandos ali
 desautorizar grupo               (dentro de um grupo, so o dono) remove a permissao
 ```
+
+Os comandos funcionam com ou sem acento e em qualquer combinação de maiúsculas/minúsculas
+(`disponiveis`, `disponíveis`, `DISPONÍVEIS` — todos funcionam igual).
+
+### Confirmar que o bot está online
+
+Se preencher `BOT_NAME` no `.env` (ex: `BOT_NAME=Pierre`), mandar só esse nome funciona como
+um "tá vivo?" — o bot responde confirmando que está online, sem precisar lembrar um comando.
 
 ## Instalação no Termux
 
