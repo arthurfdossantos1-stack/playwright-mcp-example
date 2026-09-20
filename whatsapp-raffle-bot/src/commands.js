@@ -15,19 +15,16 @@ import {
 import { generateGridImage } from './grid-image.js';
 import { generateGridImageWithHeader } from './grid-image-header.js';
 
-// Se configurado (BOT_NAME no .env), mandar so o nome do bot funciona como um
-// "ping" pra confirmar que ele esta online, sem precisar lembrar um comando.
-const BOT_NAME = (process.env.BOT_NAME || '').trim();
+// Le direto do process.env a cada chamada (em vez de guardar num const no
+// carregamento do modulo) porque o index.js so termina de ler o .env depois
+// que este arquivo e importado - um const fixo sempre pegaria valor vazio.
+function getEnv(key) {
+  return (process.env[key] || '').trim();
+}
 
-// Dados do PIX que o comando "pix" devolve. PIX_MESSAGE, se preenchido,
-// substitui totalmente o texto padrao montado a partir dos outros campos.
-const PIX_KEY = (process.env.PIX_KEY || '').trim();
-const PIX_NAME = (process.env.PIX_NAME || '').trim();
-const PIX_BANK = (process.env.PIX_BANK || '').trim();
-// "\n" digitado no .env vira quebra de linha de verdade aqui.
-const PIX_MESSAGE = (process.env.PIX_MESSAGE || '').trim().replace(/\\n/g, '\n');
-
-const HELP = `*Bot de Rifa - Comandos*
+function buildHelp() {
+  const botName = getEnv('BOT_NAME');
+  return `*Bot de Rifa - Comandos*
 
 *Criar e escolher a rifa*
 nova <quantidade> [nome] - cria uma rifa nova e ja deixa ela ativa
@@ -63,7 +60,7 @@ vendidos - lista todos os numeros ja vendidos e para quem
 *Outros*
 pix - mostra os dados de pagamento configurados
 apagar - apaga a ultima mensagem que o bot mandou aqui
-ajuda - mostra esta mensagem${BOT_NAME ? `\nmandar so "${BOT_NAME}" - confirma que o bot esta online` : ''}
+ajuda - mostra esta mensagem${botName ? `\nmandar so "${botName}" - confirma que o bot esta online` : ''}
 
 *Figurinhas:* manda uma imagem (ou video/GIF) e, na legenda ou logo em
 seguida, "figurinha" (ou "sticker"). Video/GIF vira figurinha animada,
@@ -77,6 +74,7 @@ responde a comandos - mensagem solta tipo "oi" fica sem resposta.
 *Em grupos:* mande "autorizar grupo" de dentro do grupo (so funciona vindo de
 voce, dono do bot) para liberar os comandos ali. "desautorizar grupo" remove
 a permissao. Outros grupos continuam sendo ignorados.`;
+}
 
 function stripAccents(text) {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -261,7 +259,8 @@ export async function handleCommand(rawText) {
   const text = rawText.trim();
   if (!text) return null;
 
-  if (BOT_NAME && stripAccents(text.toLowerCase()) === stripAccents(BOT_NAME.toLowerCase())) {
+  const botName = getEnv('BOT_NAME');
+  if (botName && stripAccents(text.toLowerCase()) === stripAccents(botName.toLowerCase())) {
     return `Oi! Estou online. Mande "ajuda" para ver os comandos.`;
   }
 
@@ -273,7 +272,7 @@ export async function handleCommand(rawText) {
     case 'ajuda':
     case 'help':
     case 'menu':
-      return HELP;
+      return buildHelp();
 
     case 'nova': {
       const [totalStr, ...nameParts] = rest;
@@ -390,13 +389,17 @@ export async function handleCommand(rawText) {
     }
 
     case 'pix': {
-      if (PIX_MESSAGE) return PIX_MESSAGE;
-      if (!PIX_KEY) {
+      const pixMessage = getEnv('PIX_MESSAGE').replace(/\\n/g, '\n');
+      if (pixMessage) return pixMessage;
+      const pixKey = getEnv('PIX_KEY');
+      if (!pixKey) {
         return 'Chave PIX ainda nao configurada. Preencha PIX_KEY (e opcionalmente PIX_NAME, PIX_BANK) no .env.';
       }
-      const linhas = ['*Dados para pagamento (PIX)*', `Chave: ${PIX_KEY}`];
-      if (PIX_NAME) linhas.push(`Nome: ${PIX_NAME}`);
-      if (PIX_BANK) linhas.push(`Banco: ${PIX_BANK}`);
+      const linhas = ['*Dados para pagamento (PIX)*', `Chave: ${pixKey}`];
+      const pixName = getEnv('PIX_NAME');
+      const pixBank = getEnv('PIX_BANK');
+      if (pixName) linhas.push(`Nome: ${pixName}`);
+      if (pixBank) linhas.push(`Banco: ${pixBank}`);
       return linhas.join('\n');
     }
 
