@@ -92,6 +92,16 @@ export function getRaffle(id) {
   return state.raffles[id] || null;
 }
 
+export function setRaffleInfo(id, { price, drawDate } = {}) {
+  const state = load();
+  const raffle = state.raffles[id];
+  if (!raffle) return { ok: false };
+  if (price !== undefined) raffle.price = price;
+  if (drawDate !== undefined) raffle.drawDate = drawDate;
+  save(state);
+  return { ok: true, raffle };
+}
+
 export function resetAllNumbers(id) {
   const state = load();
   const raffle = state.raffles[id];

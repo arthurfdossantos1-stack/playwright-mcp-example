@@ -30,10 +30,13 @@ Mensagens comuns, tipo "oi" ou papo aleatório, ficam sem resposta.
 
 ```
 nova <quantidade> [nome]        cria uma rifa nova (fica ativa). Ex: nova 500 Rifa de Pascoa
-<numero(s)> <nome do comprador>  registra venda(s). Ex: 23 Joao Silva  /  Ex: 1,2,3 Joao Silva
-vender <numero(s)> <nome>       mesma coisa, forma explicita
+titulo <valor> <data>           define valor por numero + data do sorteio, que passam a
+                                 aparecer no topo da imagem do "disponiveis"
+                                 Ex: titulo 5,00 20/10/2026
+vender <numero(s)> <nome>       registra venda(s) - precisa comecar com "vender"
+                                 Ex: vender 23 Joao Silva  /  vender 1,2,3 Joao Silva
                                  varias linhas tambem funciona, uma venda por linha:
-                                   10 Maria
+                                   vender 10 Maria
                                    11 Joao
                                    12 Kaio
 excluir/desfazer/desmarcar <numero(s)>   libera numero(s) vendido(s) por engano
@@ -41,6 +44,7 @@ excluir/desfazer/desmarcar todos          libera TODOS os numeros vendidos da ri
 excluir rifa [id]                apaga uma rifa inteira (sem id, apaga a rifa ativa)
 status <numero>                  consulta um numero especifico
 disponiveis                      manda uma imagem com todos os numeros, X nos ja vendidos
+                                 (com titulo no topo se configurado com "titulo")
 vendidos                         lista em texto os numeros vendidos e para quem
 rifas                            lista todas as rifas ja criadas
 usar <id>                        troca qual rifa esta ativa

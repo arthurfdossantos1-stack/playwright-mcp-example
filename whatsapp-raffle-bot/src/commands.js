@@ -10,6 +10,7 @@ import {
   getSoldNumbers,
   deleteRaffle,
   resetAllNumbers,
+  setRaffleInfo,
 } from './store.js';
 import { generateGridImage } from './grid-image.js';
 import { generateGridImageWithHeader } from './grid-image-header.js';
@@ -36,6 +37,9 @@ usar <id> - troca qual rifa fica ativa (se voce tiver mais de uma)
   Ex: usar 2
 excluir rifa [id] - apaga uma rifa inteira (sem id, apaga a rifa ativa)
   Ex: excluir rifa  /  excluir rifa 2
+titulo <valor> <data do sorteio> - define o titulo que aparece no topo da
+  imagem do "disponiveis" (valor por numero + data do sorteio)
+  Ex: titulo 5,00 20/10/2026
 
 *Registrar vendas*
 vender <numero(s)> <nome> - registra uma venda (precisa comecar com "vender")
@@ -51,8 +55,7 @@ desfazer <numero(s)> - libera de novo numero(s) vendido(s) por engano
 *Consultar*
 status <numero> - mostra se um numero especifico esta disponivel ou vendido
 disponiveis - manda uma imagem com todos os numeros, X nos ja vendidos
-disponiveis2 <valor> <data> - (teste) igual "disponiveis", com titulo em cima
-  Ex: disponiveis2 5,00 20/10/2026
+  (com titulo no topo se voce configurou com "titulo")
 vendidos - lista todos os numeros ja vendidos e para quem
 
 *Outros*
@@ -323,28 +326,26 @@ export async function handleCommand(rawText) {
       const { raffle, error } = requireActive();
       if (error) return error;
       const disponiveis = getAvailableNumbers(raffle.id).length;
+      const image =
+        raffle.price && raffle.drawDate
+          ? await generateGridImageWithHeader(raffle, raffle.price, raffle.drawDate)
+          : generateGridImage(raffle);
       return {
-        image: generateGridImage(raffle),
+        image,
         caption: `*${raffle.name}*\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
       };
     }
 
-    // Comando de teste: mesma coisa do "disponiveis", mas com uma faixa de
-    // titulo em cima (nome, valor por numero, data do sorteio). Nao mexe no
-    // "disponiveis" de verdade.
-    case 'disponiveis2': {
+    case 'titulo': {
       const [valor, ...dataParts] = rest;
       const data = dataParts.join(' ');
       if (!valor || !data) {
-        return 'Uso (teste): disponiveis2 <valor> <data do sorteio>\n  Ex: disponiveis2 5,00 20/10/2026';
+        return 'Uso: titulo <valor por numero> <data do sorteio>\n  Ex: titulo 5,00 20/10/2026';
       }
       const { raffle, error } = requireActive();
       if (error) return error;
-      const disponiveis = getAvailableNumbers(raffle.id).length;
-      return {
-        image: await generateGridImageWithHeader(raffle, valor, data),
-        caption: `*${raffle.name}* (teste com titulo)\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
-      };
+      setRaffleInfo(raffle.id, { price: valor, drawDate: data });
+      return `Titulo definido para "${raffle.name}":\nCada numero: R$ ${valor}\nSorteio: ${data}\nAgora "disponiveis" ja mostra isso na imagem.`;
     }
 
     case 'vendidos': {
