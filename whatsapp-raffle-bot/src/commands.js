@@ -26,22 +26,8 @@ ajuda - mostra esta mensagem
 *Em grupos:* mande "autorizar grupo" dentro do grupo (so voce, dono do bot,
 consegue) para liberar os comandos ali. "desautorizar grupo" remove.`;
 
-function compressRanges(numbers) {
-  if (numbers.length === 0) return 'nenhum';
-  const parts = [];
-  let start = numbers[0];
-  let prev = numbers[0];
-  for (let i = 1; i <= numbers.length; i++) {
-    const cur = numbers[i];
-    if (cur === prev + 1) {
-      prev = cur;
-      continue;
-    }
-    parts.push(start === prev ? `${start}` : `${start}-${prev}`);
-    start = cur;
-    prev = cur;
-  }
-  return parts.join(', ');
+function stripAccents(text) {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 function requireActive() {
@@ -85,7 +71,7 @@ export function handleCommand(rawText) {
   }
 
   const [cmdRaw, ...rest] = tokens;
-  const cmd = cmdRaw.toLowerCase().replace(/^\//, '');
+  const cmd = stripAccents(cmdRaw.toLowerCase().replace(/^\//, ''));
 
   switch (cmd) {
     case 'ajuda':
@@ -143,7 +129,8 @@ export function handleCommand(rawText) {
       const { raffle, error } = requireActive();
       if (error) return error;
       const numbers = getAvailableNumbers(raffle.id);
-      return `*${raffle.name}* - disponiveis: ${numbers.length}/${raffle.total}\n${compressRanges(numbers)}`;
+      const lista = numbers.length ? numbers.join(', ') : 'nenhum';
+      return `*${raffle.name}* - disponiveis: ${numbers.length}/${raffle.total}\n${lista}`;
     }
 
     case 'vendidos': {
