@@ -12,7 +12,6 @@ import {
   resetAllNumbers,
 } from './store.js';
 import { generateGridImage } from './grid-image.js';
-import { generateGridImageSmooth } from './grid-image-v2.js';
 
 // Se configurado (BOT_NAME no .env), mandar so o nome do bot funciona como um
 // "ping" pra confirmar que ele esta online, sem precisar lembrar um comando.
@@ -51,7 +50,6 @@ desfazer <numero(s)> - libera de novo numero(s) vendido(s) por engano
 *Consultar*
 status <numero> - mostra se um numero especifico esta disponivel ou vendido
 disponiveis - manda uma imagem com todos os numeros, X nos ja vendidos
-disponiveis2 - (teste) igual "disponiveis", mas com fonte suavizada
 vendidos - lista todos os numeros ja vendidos e para quem
 
 *Outros*
@@ -246,7 +244,7 @@ function deleteRaffleCommand(id) {
   return `Rifa "${result.raffle.name}" (id ${raffleId}) excluida.${aviso}`;
 }
 
-export async function handleCommand(rawText) {
+export function handleCommand(rawText) {
   const text = rawText.trim();
   if (!text) return null;
 
@@ -325,19 +323,6 @@ export async function handleCommand(rawText) {
       return {
         image: generateGridImage(raffle),
         caption: `*${raffle.name}*\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
-      };
-    }
-
-    // Comando de teste: mesma imagem do "disponiveis", mas com fonte suave
-    // (jimp) em vez da fonte de pixel. So pra comparar - nao mexe no
-    // "disponiveis" de verdade.
-    case 'disponiveis2': {
-      const { raffle, error } = requireActive();
-      if (error) return error;
-      const disponiveis = getAvailableNumbers(raffle.id).length;
-      return {
-        image: await generateGridImageSmooth(raffle),
-        caption: `*${raffle.name}* (teste fonte suave)\nDisponiveis: ${disponiveis}/${raffle.total}\nX = vendido`,
       };
     }
 
