@@ -78,18 +78,28 @@ export default async function PaginaLeads({
     };
   });
 
-  // Mesmo critério da /app/enviar-mensagem, para os números baterem com o que
-  // a fila realmente mostra.
-  const ativos = ((leads ?? []) as unknown as LinhaLead[]).filter(
-    (l) => l.status === "novo" || l.status === "contatado",
-  );
-  const comEmpresa = ativos
-    .map((l) => (Array.isArray(l.empresas) ? l.empresas[0] : l.empresas))
-    .filter((e): e is NonNullable<LinhaLead["empresas"]> => Boolean(e));
-
-  const prontos = comEmpresa.filter((e) => e.whatsapp_e164 && !e.contatado_fila_em).length;
-  const semWhatsapp = comEmpresa.filter((e) => !e.whatsapp_e164).length;
-  const jaContatados = comEmpresa.filter((e) => e.whatsapp_e164 && e.contatado_fila_em).length;
+  // Contado no BANCO, nao sobre a lista ja carregada. Derivar contagem de um
+  // array que veio com `limit` foi exatamente o bug que escondia lead da
+  // fila: o corte acontece antes do filtro.
+  const [{ count: prontos }, { count: semWhatsapp }, { count: jaContatados }] = await Promise.all([
+    supabase
+      .from("empresas")
+      .select("id, leads!inner ( status )", { count: "exact", head: true })
+      .not("whatsapp_e164", "is", null)
+      .is("contatado_fila_em", null)
+      .in("leads.status", ["novo", "contatado"]),
+    supabase
+      .from("empresas")
+      .select("id, leads!inner ( status )", { count: "exact", head: true })
+      .is("whatsapp_e164", null)
+      .in("leads.status", ["novo", "contatado"]),
+    supabase
+      .from("empresas")
+      .select("id, leads!inner ( status )", { count: "exact", head: true })
+      .not("whatsapp_e164", "is", null)
+      .not("contatado_fila_em", "is", null)
+      .in("leads.status", ["novo", "contatado"]),
+  ]);
 
   const listaProjetos = (projetos ?? []) as Projeto[];
 
@@ -133,9 +143,9 @@ export default async function PaginaLeads({
 
       {cartoes.length > 0 && (
         <PainelEnvioFunil
-          prontos={prontos}
-          semWhatsapp={semWhatsapp}
-          jaContatados={jaContatados}
+          prontos={prontos ?? 0}
+          semWhatsapp={semWhatsapp ?? 0}
+          jaContatados={jaContatados ?? 0}
         />
       )}
 

@@ -6,7 +6,7 @@ import type { LeadStatus, Template } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Enviar mensagem" };
 
-type EmpresaDaFila = {
+type LinhaEmpresa = {
   id: string;
   nome: string;
   endereco: string | null;
@@ -18,14 +18,8 @@ type EmpresaDaFila = {
   website: string | null;
   prioridade: ItemFila["prioridade"];
   score_radar: number;
-  contatado_fila_em: string | null;
   buscas: { nicho: string; cidade: string } | { nicho: string; cidade: string }[] | null;
-};
-
-type LinhaLead = {
-  id: string;
-  status: LeadStatus;
-  empresas: EmpresaDaFila | EmpresaDaFila[] | null;
+  leads: { id: string; status: LeadStatus } | { id: string; status: LeadStatus }[] | null;
 };
 
 /**
@@ -34,17 +28,27 @@ type LinhaLead = {
  * Quem manda lead para ca e o botao "Enviar para o funil" das telas de
  * resultado e do radar: so aparecem aqui os leads que voce escolheu, que
  * ainda nao receberam mensagem e que tem celular valido no pais da busca.
+ *
+ * A consulta parte de EMPRESAS, nao de leads, de proposito. Partindo de leads,
+ * os filtros de "tem celular" e "ainda nao contatado" caiam sobre a tabela
+ * embutida e so davam para aplicar em JavaScript — ou seja, DEPOIS do
+ * `limit`. Com 510 leads e so 85 elegiveis, o corte comia 47 deles antes do
+ * filtro rodar e a fila aparecia quase vazia. Aqui os filtros pesados ficam
+ * na tabela principal, entao o limite se aplica ao que ja passou por eles.
  */
 export default async function PaginaEnviarMensagem() {
   const supabase = await criarClienteServidor();
 
-  const [{ data: leads }, { data: templates }, { data: perfil }] = await Promise.all([
+  const [{ data: empresas }, { data: templates }, { data: perfil }] = await Promise.all([
     supabase
-      .from("leads")
+      .from("empresas")
       .select(
-        "id, status, empresas!inner ( id, nome, endereco, telefone, whatsapp_e164, nota, total_avaliacoes, instagram, website, prioridade, score_radar, contatado_fila_em, buscas ( nicho, cidade ) )",
+        "id, nome, endereco, telefone, whatsapp_e164, nota, total_avaliacoes, instagram, website, prioridade, score_radar, buscas ( nicho, cidade ), leads!inner ( id, status )",
       )
-      .in("status", ["novo", "contatado"])
+      .not("whatsapp_e164", "is", null)
+      .is("contatado_fila_em", null)
+      .in("leads.status", ["novo", "contatado"])
+      .order("score_radar", { ascending: false })
       .limit(300),
     supabase.from("templates").select("*").order("criado_em", { ascending: false }),
     (async () => {
@@ -57,32 +61,32 @@ export default async function PaginaEnviarMensagem() {
   ]);
 
   const itens: ItemFila[] = [];
-  for (const linha of (leads ?? []) as unknown as LinhaLead[]) {
-    const empresa = Array.isArray(linha.empresas) ? linha.empresas[0] : linha.empresas;
-    if (!empresa) continue;
-    // Sem celular válido não dá para abrir o wa.me; já contatado saiu da fila.
-    if (!empresa.whatsapp_e164 || empresa.contatado_fila_em) continue;
+  for (const linha of (empresas ?? []) as unknown as LinhaEmpresa[]) {
+    const lead = Array.isArray(linha.leads) ? linha.leads[0] : linha.leads;
+    // Rede de segurança: se o filtro da tabela embutida não pegar, o status
+    // ainda é conferido aqui antes de o lead entrar na fila.
+    if (!lead || (lead.status !== "novo" && lead.status !== "contatado")) continue;
+    if (!linha.whatsapp_e164) continue;
 
-    const busca = Array.isArray(empresa.buscas) ? empresa.buscas[0] : empresa.buscas;
+    const busca = Array.isArray(linha.buscas) ? linha.buscas[0] : linha.buscas;
     itens.push({
-      id: empresa.id,
-      leadId: linha.id,
-      leadStatus: linha.status,
-      nome: empresa.nome,
-      endereco: empresa.endereco,
-      telefone: empresa.telefone,
-      whatsapp_e164: empresa.whatsapp_e164,
-      nota: empresa.nota,
-      total_avaliacoes: empresa.total_avaliacoes,
-      instagram: empresa.instagram,
-      website: empresa.website,
-      prioridade: empresa.prioridade,
-      scoreRadar: empresa.score_radar,
+      id: linha.id,
+      leadId: lead.id,
+      leadStatus: lead.status,
+      nome: linha.nome,
+      endereco: linha.endereco,
+      telefone: linha.telefone,
+      whatsapp_e164: linha.whatsapp_e164,
+      nota: linha.nota,
+      total_avaliacoes: linha.total_avaliacoes,
+      instagram: linha.instagram,
+      website: linha.website,
+      prioridade: linha.prioridade,
+      scoreRadar: linha.score_radar,
       nicho: busca?.nicho ?? null,
       cidade: busca?.cidade ?? null,
     });
   }
-  itens.sort((a, b) => b.scoreRadar - a.scoreRadar);
 
   return (
     <>

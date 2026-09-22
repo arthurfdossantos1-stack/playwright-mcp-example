@@ -27,7 +27,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     redirect("/auth/verificacao?proximo=/app");
   }
 
-  const [{ data: perfil }, { count: pendentes }, { data: leadsDaFila }] = await Promise.all([
+  const [{ data: perfil }, { count: pendentes }, { count: filaWhatsapp }] = await Promise.all([
     supabase.from("profiles").select("nome, email").eq("id", user.id).maybeSingle(),
     supabase
       .from("follow_ups")
@@ -35,24 +35,17 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       .eq("user_id", user.id)
       .in("status", ["pendente", "pronto"])
       .lte("agendado_para", new Date().toISOString()),
-    // Mesmo criterio da /app/enviar-mensagem. Antes o badge contava TODA
-    // empresa com celular valido, entao mostrava um numero que nao batia com
-    // o tamanho real da fila. O filtro final fica em JS, igual ao da pagina.
+    // Mesmo criterio da /app/enviar-mensagem, e contado no BANCO. Contar em
+    // JS depois de um `limit` era o bug que escondia lead da fila: o corte
+    // acontecia antes do filtro.
     supabase
-      .from("leads")
-      .select("id, empresas ( whatsapp_e164, contatado_fila_em )")
+      .from("empresas")
+      .select("id, leads!inner ( status )", { count: "exact", head: true })
       .eq("user_id", user.id)
-      .in("status", ["novo", "contatado"])
-      .limit(300),
+      .not("whatsapp_e164", "is", null)
+      .is("contatado_fila_em", null)
+      .in("leads.status", ["novo", "contatado"]),
   ]);
-
-  type EmpresaDaFila = { whatsapp_e164: string | null; contatado_fila_em: string | null };
-  const filaWhatsapp = (
-    (leadsDaFila ?? []) as unknown as { empresas: EmpresaDaFila | EmpresaDaFila[] | null }[]
-  ).filter((lead) => {
-    const empresa = Array.isArray(lead.empresas) ? lead.empresas[0] : lead.empresas;
-    return Boolean(empresa?.whatsapp_e164) && !empresa?.contatado_fila_em;
-  }).length;
 
   const nome =
     perfil?.nome ??
@@ -65,7 +58,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         nome={nome}
         email={perfil?.email ?? user.email ?? ""}
         pendentes={pendentes ?? 0}
-        filaWhatsapp={filaWhatsapp}
+        filaWhatsapp={filaWhatsapp ?? 0}
       />
       <div className="lg:pl-60">
         {/* pb-24 no mobile abre espaço para a barra inferior fixa */}
@@ -75,7 +68,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </main>
       </div>
 
-      <NavInferior pendentes={pendentes ?? 0} filaWhatsapp={filaWhatsapp} />
+      <NavInferior pendentes={pendentes ?? 0} filaWhatsapp={filaWhatsapp ?? 0} />
     </div>
   );
 }
