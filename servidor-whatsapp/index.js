@@ -249,25 +249,62 @@ async function consultar() {
 }
 
 async function enviarItem(item) {
-  const jid = `${item.numero}@s.whatsapp.net`;
   try {
     // Número sem WhatsApp é mensagem que nunca chega e conta como sinal ruim.
-    const [existe] = await socket.onWhatsApp(jid);
+    const [existe] = await socket.onWhatsApp(item.numero);
     if (!existe?.exists) {
       resultadosPendentes.push({ itemId: item.id, estado: "pulado", motivo: "não tem WhatsApp" });
       return true;
     }
 
+    // O JID de verdade vem daqui, e no Brasil ele quase nunca e o numero que
+    // a gente tem: conta antiga vive sem o nono digito. Montar
+    // `${numero}@s.whatsapp.net` manda pra um endereco que o servidor aceita
+    // e ninguem recebe — a mensagem "sai" e nao chega em lugar nenhum.
+    const jid = existe.jid ?? `${item.numero}@s.whatsapp.net`;
     await socket.sendMessage(jid, { text: item.texto });
     registrarEnvio();
     resultadosPendentes.push({ itemId: item.id, estado: "enviado" });
-    log.info({ numero: item.numero }, "enviada");
+    log.info({ numero: item.numero, jid }, "enviada");
     return true;
   } catch (e) {
     const motivo = String(e?.message ?? e).slice(0, 300);
     log.error({ motivo }, "falha ao enviar");
     resultadosPendentes.push({ itemId: item.id, estado: "falhou", motivo });
     return false;
+  }
+}
+
+/** O app zera o comando ao entregar: quem le e o unico que pode agir. */
+async function aplicarComando(comando) {
+  if (comando === "conectar") await conectar().catch((e) => log.error({ e }, "falha ao conectar"));
+  if (comando === "desconectar") await desconectar();
+}
+
+/**
+ * Espera entre mensagens sem sumir do mapa.
+ *
+ * O app decide "servidor no ar?" por `visto_em`, com 45s de tolerancia. Como
+ * o intervalo entre mensagens chega a 180s, ficar so dormindo fazia a tela
+ * dizer "fora do ar" e "desconectado" no meio de um disparo que estava indo
+ * bem. De quebra, cada consulta entrega os resultados acumulados: se o
+ * Android matar o Termux, perde-se no maximo a ultima mensagem, nao o lote.
+ *
+ * Os itens que vierem aqui sao ignorados de proposito — estamos no meio do
+ * intervalo. Eles voltam na proxima volta do laco, menos os ja confirmados.
+ */
+async function esperarDandoSinal(ms) {
+  const PEDACO = 20_000;
+  for (let restante = ms; restante > 0; restante -= PEDACO) {
+    await dormir(Math.min(PEDACO, restante));
+    try {
+      const trabalho = await consultar();
+      // Comando entregue aqui nao volta na proxima: um "desconectar" clicado
+      // no meio do intervalo sumiria se a gente so olhasse os itens.
+      await aplicarComando(trabalho.comando);
+    } catch (e) {
+      log.warn({ e: String(e?.message ?? e) }, "sinal de vida falhou");
+    }
   }
 }
 
@@ -292,8 +329,7 @@ async function laco() {
       continue;
     }
 
-    if (trabalho.comando === "conectar") await conectar().catch((e) => log.error({ e }));
-    if (trabalho.comando === "desconectar") await desconectar();
+    await aplicarComando(trabalho.comando);
 
     const itens = trabalho.itens ?? [];
     if (!trabalho.disparo || itens.length === 0) {
@@ -309,31 +345,33 @@ async function laco() {
 
     const { intervaloMin, intervaloMax } = trabalho.disparo;
 
-    for (const item of itens) {
-      if (!conectado) {
-        pausar = "conexão caiu no meio do disparo";
-        break;
-      }
-      if (enviadasHoje() >= tetoDeHoje()) {
-        pausar = `teto de hoje atingido (${tetoDeHoje()} mensagens)`;
-        log.warn(pausar);
-        break;
-      }
+    // UMA por volta do laço, de propósito. Percorrer o lote inteiro aqui
+    // dentro deixava o servidor até uma hora sem falar com o app: nada era
+    // confirmado, e um disparo interrompido no meio voltava com as 20
+    // mensagens ainda "pendente", como se nunca tivesse acontecido.
+    const item = itens[0];
 
-      const ok = await enviarItem(item);
-      falhasSeguidas = ok ? 0 : falhasSeguidas + 1;
-      // Três falhas seguidas quase sempre é bloqueio começando.
-      if (falhasSeguidas >= 3) {
-        pausar = "três falhas seguidas — pode ser bloqueio";
-        log.error(pausar);
-        break;
-      }
-
-      // Intervalo SORTEADO: cadência regular é o que denuncia robô.
-      const espera = intervaloMin + Math.random() * (intervaloMax - intervaloMin);
-      log.info(`próxima em ${Math.round(espera)}s`);
-      await dormir(espera * 1000);
+    if (enviadasHoje() >= tetoDeHoje()) {
+      pausar = `teto de hoje atingido (${tetoDeHoje()} mensagens)`;
+      log.warn(pausar);
+      await dormir(ESPERA_OCIOSO);
+      continue;
     }
+
+    const ok = await enviarItem(item);
+    falhasSeguidas = ok ? 0 : falhasSeguidas + 1;
+    // Três falhas seguidas quase sempre é bloqueio começando.
+    if (falhasSeguidas >= 3) {
+      pausar = "três falhas seguidas — pode ser bloqueio";
+      log.error(pausar);
+      falhasSeguidas = 0;
+      continue;
+    }
+
+    // Intervalo SORTEADO: cadência regular é o que denuncia robô.
+    const espera = intervaloMin + Math.random() * (intervaloMax - intervaloMin);
+    log.info(`próxima em ${Math.round(espera)}s`);
+    await esperarDandoSinal(espera * 1000);
   }
 }
 
