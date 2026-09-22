@@ -77,6 +77,33 @@ diante. Não é problema: reabra o Termux, rode `npm start` de novo e o disparo
 continua de onde parou. Enquanto estiver disparando, o melhor é **deixar a
 tela do Termux aberta**.
 
+## Se aparecer "app respondeu 401"
+
+Significa que a rota existe no site publicado (senão seria 404), mas a chave
+não bate. O próprio servidor diagnostica: ele consulta
+`SEU_SITE/api/whatsapp/agente` e diz em uma linha qual é a causa — variável
+ausente, valor diferente, aspas ou espaço sobrando.
+
+Você também pode abrir esse endereço no navegador. Ele devolve algo assim:
+
+```json
+{ "configurado": true, "tamanho": 44, "impressao": "015c1470" }
+```
+
+Nenhum segredo sai daí: `impressao` é um resumo de 8 dígitos, só para
+comparar os dois lados. Para ver a impressão da sua chave local:
+
+```bash
+node -e 'console.log(require("node:crypto").createHash("sha256").update("rastrolead-impressao-v1"+process.env.CHAVE).digest("hex").slice(0,8))'
+```
+
+Iguais, o problema não é a chave. Diferentes — ou `configurado: false` —
+ajuste na Netlify em **Site configuration → Environment variables**,
+deixando marcados **todos os deploy contexts** e **todos os scopes**
+(`Functions` inclusive; só `Builds` não chega na rota). Depois **Trigger
+deploy → Clear cache and deploy site**: na Netlify a variável entra na função
+no momento do deploy, então salvar sem republicar não muda nada.
+
 ## Rodando num servidor de verdade
 
 Qualquer lugar que rode Node 24h: Railway, Render, Fly.io, VPS. Cerca de

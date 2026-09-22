@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -7,6 +8,35 @@ export const dynamic = "force-dynamic";
 
 /** Quantos itens o servidor leva por consulta. */
 const LOTE = 20;
+
+/**
+ * Impressao digital da chave. O sal evita que um segredo fraco ("senha123")
+ * seja identificado por tabela pronta; 8 digitos servem pra comparar, nao
+ * pra reconstruir nada.
+ */
+const SAL_IMPRESSAO = "rastrolead-impressao-v1";
+
+function impressaoDaChave(chave: string): string {
+  return createHash("sha256").update(SAL_IMPRESSAO + chave).digest("hex").slice(0, 8);
+}
+
+/**
+ * Diagnostico de chave, sem autenticacao de proposito: quem esta travado no
+ * 401 ainda nao consegue se autenticar. Nao devolve o segredo — so se ele
+ * chegou ate a funcao, o tamanho e a impressao, que e o bastante pra separar
+ * "a variavel nao existe" de "existe com outro valor".
+ */
+export async function GET() {
+  const chave = process.env.WHATSAPP_WORKER_SECRET ?? "";
+  return NextResponse.json({
+    configurado: chave.length > 0,
+    tamanho: chave.length,
+    impressao: chave ? impressaoDaChave(chave) : null,
+    // Espaco ou aspas coladas no valor sao o erro mais comum de copiar e colar.
+    temEspacoSobrando: chave !== chave.trim(),
+    temAspas: /^["'].*["']$/.test(chave),
+  });
+}
 
 const Resultado = z.object({
   itemId: z.string().uuid(),

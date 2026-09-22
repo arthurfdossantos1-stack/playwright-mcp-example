@@ -1,0 +1,7 @@
+# Credenciais da sessao do WhatsApp. Quem tem esta pasta entra na conta sem
+# escanear QR nenhum — ela nunca pode virar commit.
+dados/
+*.env
+
+# Gerado na maquina onde o servidor roda (Termux e amd64 resolvem diferente).
+package-lock.json

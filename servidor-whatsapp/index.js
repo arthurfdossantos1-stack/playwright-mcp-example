@@ -15,6 +15,7 @@
 import qrcode from "qrcode";
 import pino from "pino";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   makeWASocket,
@@ -147,6 +148,73 @@ async function desconectar() {
   log.info("desconectado e sessão apagada");
 }
 
+// --------------------------------------------------------- chave errada
+
+const SAL_IMPRESSAO = "rastrolead-impressao-v1";
+let jaDiagnosticou = false;
+
+/**
+ * 401 é sempre a mesma família de erro, mas com causas diferentes, e o log
+ * cru ("app respondeu 401") não separa elas. Aqui a gente pergunta ao app o
+ * que ele tem — sem trocar segredo, só a impressão digital — e diz em uma
+ * linha o que fazer.
+ */
+async function diagnosticarChave() {
+  if (jaDiagnosticou) return;
+
+  const minha = createHash("sha256").update(SAL_IMPRESSAO + CHAVE).digest("hex").slice(0, 8);
+
+  let d;
+  try {
+    const r = await fetch(`${APP_URL}/api/whatsapp/agente`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (r.status === 405 || r.status === 404) {
+      log.error(
+        "o app publicado é mais antigo que este servidor. Faça um novo deploy na Netlify (Trigger deploy > Clear cache and deploy site).",
+      );
+      return;
+    }
+    if (!r.ok) {
+      log.error(`diagnóstico respondeu ${r.status}; não dá pra dizer qual é a causa.`);
+      return;
+    }
+    d = await r.json();
+    // Só agora a resposta é conclusiva: antes disso vale tentar de novo,
+    // senão um deploy antigo silenciaria o diagnóstico pra sempre.
+    jaDiagnosticou = true;
+  } catch (e) {
+    log.error({ e: String(e?.message ?? e) }, "não consegui rodar o diagnóstico");
+    return;
+  }
+
+  if (!d.configurado) {
+    log.error(
+      "o app NÃO tem WHATSAPP_WORKER_SECRET. Na Netlify: Site configuration > Environment variables > Add. Marque todos os deploy contexts e todos os scopes (Functions inclusive). Depois Trigger deploy > Clear cache and deploy site.",
+    );
+    return;
+  }
+  if (d.temAspas) {
+    log.error("a chave no app está entre aspas. Salve o valor sem aspas e faça o deploy de novo.");
+    return;
+  }
+  if (d.temEspacoSobrando) {
+    log.error("a chave no app tem espaço sobrando nas pontas. Salve sem espaços e faça o deploy.");
+    return;
+  }
+  if (d.impressao !== minha) {
+    log.error(
+      { chaveDoApp: `${d.tamanho} caracteres`, minhaChave: `${CHAVE.length} caracteres` },
+      "o app tem uma chave DIFERENTE da sua. Copie o mesmo valor nos dois lados e faça o deploy.",
+    );
+    return;
+  }
+
+  log.error(
+    "as duas chaves são iguais — então o 401 não é a chave. Confira se APP_URL aponta pro site publicado e me avise.",
+  );
+}
+
 // -------------------------------------------------------------- laço
 
 async function consultar() {
@@ -173,7 +241,9 @@ async function consultar() {
     // Devolve os resultados à fila: perder confirmação faz o app reenviar o
     // mesmo lead depois, e ninguém quer receber a mensagem duas vezes.
     resultadosPendentes.unshift(...corpo.resultados);
-    throw new Error(`app respondeu ${r.status}`);
+    const erro = new Error(`app respondeu ${r.status}`);
+    erro.status = r.status;
+    throw erro;
   }
   return r.json();
 }
@@ -208,7 +278,15 @@ async function laco() {
     let trabalho = null;
     try {
       trabalho = await consultar();
+      jaDiagnosticou = false;
     } catch (e) {
+      if (e?.status === 401) {
+        await diagnosticarChave();
+        // Config errada não conserta em 8s, e o log vira uma parede de WARN.
+        // Meio minuto ainda pega o deploy novo rápido sem poluir a tela.
+        await dormir(30_000);
+        continue;
+      }
       log.warn({ e: String(e?.message ?? e) }, "não consegui falar com o app");
       await dormir(ESPERA_OCIOSO);
       continue;
