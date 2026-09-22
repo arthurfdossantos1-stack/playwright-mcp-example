@@ -6,21 +6,31 @@ import { useCallback, useEffect, useState } from "react";
 import type { Template } from "@/lib/types";
 
 type Estado = {
-  configurado: boolean;
-  conectado?: boolean;
-  numero?: string | null;
-  qr?: string | null;
-  tetoHoje?: number;
-  enviadasHoje?: number;
-  campanha?: {
-    estado: "rodando" | "parada" | "concluida";
-    motivo: string | null;
+  userId: string;
+  /** O servidor deu sinal de vida nos últimos segundos? */
+  servidorVivo: boolean;
+  vistoEm: string | null;
+  conectado: boolean;
+  numero: string | null;
+  qr: string | null;
+  comandoPendente: string | null;
+  enviadasHoje: number;
+  tetoHoje: number;
+  campanha: {
+    estado: "pendente" | "rodando" | "pausado" | "concluido" | "cancelado";
     total: number;
     enviados: number;
     pulados: number;
     falhas: number;
   } | null;
-  erro?: string;
+};
+
+const ROTULO_CAMPANHA: Record<string, string> = {
+  pendente: "Aguardando o servidor pegar",
+  rodando: "Disparando…",
+  pausado: "Disparo pausado",
+  concluido: "Disparo concluído",
+  cancelado: "Disparo cancelado",
 };
 
 export function PainelWhatsapp({ templates }: { templates: Template[] }) {
@@ -69,26 +79,9 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
     }
   }
 
-  if (estado && !estado.configurado) {
-    return (
-      <div className="cartao p-6">
-        <h2 className="text-base font-bold text-slate-900">Servidor não configurado</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          O disparo automático precisa de um servidor ligado 24 horas — a Netlify não mantém a
-          sessão do WhatsApp aberta. O código está na pasta{" "}
-          <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">servidor-whatsapp/</code> do
-          repositório, com as instruções de como subir.
-        </p>
-        <p className="mt-3 text-sm text-slate-600">
-          Depois de subir, configure <strong>WHATSAPP_WORKER_URL</strong> e{" "}
-          <strong>WHATSAPP_WORKER_SECRET</strong> na Netlify.
-        </p>
-      </div>
-    );
-  }
-
   const campanha = estado?.campanha;
-  const rodando = campanha?.estado === "rodando";
+
+  const rodando = campanha?.estado === "rodando" || campanha?.estado === "pendente";
 
   return (
     <div className="space-y-5">
@@ -113,6 +106,41 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
 
       <div className="cartao p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-slate-900">Servidor</h2>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+              {estado?.servidorVivo
+                ? "No ar e perguntando por trabalho."
+                : estado?.vistoEm
+                  ? "Parou de dar sinal. Se está no Termux, o Android provavelmente matou o processo — reabra e rode npm start."
+                  : "Nunca deu sinal. Suba a pasta servidor-whatsapp/ seguindo o README e ele aparece aqui sozinho."}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${
+              estado?.servidorVivo
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : "bg-slate-100 text-slate-600 ring-slate-200"
+            }`}
+          >
+            {estado?.servidorVivo ? "No ar" : "Fora do ar"}
+          </span>
+        </div>
+
+        {estado?.userId && (
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-500">
+              Seu <strong>USUARIO_ID</strong> para configurar o servidor:
+            </p>
+            <code className="mt-1 block break-all rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+              {estado.userId}
+            </code>
+          </div>
+        )}
+      </div>
+
+      <div className="cartao p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-slate-900">Conexão</h2>
             <p className="mt-1 text-sm text-slate-600">
@@ -132,11 +160,7 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
           </span>
         </div>
 
-        {estado?.erro && (
-          <p className="mt-3 rounded-lg bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700" role="alert">
-            {estado.erro}
-          </p>
-        )}
+
 
         {estado?.qr && !estado.conectado && (
           <div className="mt-4">
@@ -170,7 +194,7 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
               disabled={ocupado}
               className="botao-primario !py-2 !text-sm"
             >
-              {ocupado ? "…" : "Gerar QR Code"}
+              {ocupado ? "…" : estado?.comandoPendente ? "Pedido enviado…" : "Gerar QR Code"}
             </button>
           )}
         </div>
@@ -260,11 +284,7 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
               <div className="mt-4 rounded-xl border border-slate-200 p-3.5">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                   <span className="font-semibold text-slate-900">
-                    {campanha.estado === "rodando"
-                      ? "Disparando…"
-                      : campanha.estado === "concluida"
-                        ? "Disparo concluído"
-                        : "Disparo parado"}
+                    {ROTULO_CAMPANHA[campanha.estado] ?? campanha.estado}
                   </span>
                   <span className="text-slate-600">
                     {campanha.enviados} de {campanha.total} enviadas
@@ -276,8 +296,11 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
                     <span className="text-rose-700">{campanha.falhas} falharam</span>
                   )}
                 </div>
-                {campanha.motivo && (
-                  <p className="mt-1.5 text-sm text-amber-800">Motivo: {campanha.motivo}</p>
+                {campanha.estado === "pausado" && (
+                  <p className="mt-1.5 text-sm text-amber-800">
+                    O servidor pausou — normalmente é a conexão caindo ou o teto do dia. Ele
+                    retoma sozinho quando reconectar.
+                  </p>
                 )}
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                   <div
@@ -329,7 +352,11 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
             </div>
 
             {!estado?.conectado && (
-              <p className="mt-2 text-xs text-slate-500">Conecte um número para liberar o disparo.</p>
+              <p className="mt-2 text-xs text-slate-500">
+                {estado?.servidorVivo
+                  ? "Conecte um número para liberar o disparo."
+                  : "O servidor precisa estar no ar para disparar."}
+              </p>
             )}
           </>
         )}

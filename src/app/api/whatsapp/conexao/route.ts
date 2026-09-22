@@ -1,31 +1,37 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { chamarWorker, ErroWorker } from "@/lib/whatsapp-worker";
 
 export const runtime = "nodejs";
 
 const Entrada = z.object({ acao: z.enum(["conectar", "desconectar"]) });
 
-/** Liga ou desliga a sessão do WhatsApp no servidor. */
+/**
+ * Deixa uma ordem para o servidor.
+ *
+ * No modo pull o app nao alcanca o servidor, entao "conectar" nao e uma
+ * chamada: e um recado que fica gravado e o servidor pega na proxima
+ * consulta — poucos segundos depois.
+ */
 export async function POST(request: Request) {
   const supabase = await criarClienteServidor();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ erro: "Sessão expirada." }, { status: 401 });
+  if (!user) return NextResponse.json({ erro: "Sessao expirada." }, { status: 401 });
 
   const analise = Entrada.safeParse(await request.json().catch(() => null));
-  if (!analise.success) return NextResponse.json({ erro: "Ação inválida." }, { status: 400 });
+  if (!analise.success) return NextResponse.json({ erro: "Acao invalida." }, { status: 400 });
 
-  try {
-    await chamarWorker(`/${analise.data.acao}`, { metodo: "POST" });
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    const erro = e instanceof ErroWorker ? e : null;
-    return NextResponse.json(
-      { erro: erro?.message ?? "Falha ao falar com o servidor." },
-      { status: erro?.status ?? 502 },
-    );
-  }
+  const { error } = await supabase.from("whatsapp_sessao").upsert(
+    {
+      user_id: user.id,
+      comando: analise.data.acao,
+      atualizado_em: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+
+  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

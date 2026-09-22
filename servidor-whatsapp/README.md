@@ -1,13 +1,17 @@
 # Servidor de WhatsApp do RastroLead
 
 Mantém a sessão do WhatsApp conectada e dispara a fila **devagar**, com
-intervalo aleatório, teto diário e aquecimento.
+intervalo sorteado, teto diário e aquecimento.
 
-## Por que é um serviço separado
+## Como ele conversa com o app
 
-A Netlify executa funções sem estado e com tempo limitado. Uma sessão do
-WhatsApp é um socket que precisa ficar aberto, e um disparo de 40 mensagens
-com 60 segundos de intervalo leva 40 minutos. Nada disso cabe lá.
+Ele **pergunta** ao RastroLead se tem trabalho, num laço. Nada entra aqui de
+fora — só saem requisições.
+
+Isso é o que permite rodar num celular: não precisa de IP público, nem de
+túnel, nem de URL que muda a cada reinício. E o estado do disparo vive no
+app, então **se o processo morrer no meio, você reabre e ele retoma de onde
+parou**.
 
 ## Antes de subir: leia
 
@@ -16,27 +20,66 @@ Isto usa uma biblioteca **não oficial** que se passa pelo WhatsApp Web.
 - **Viola os termos do WhatsApp.** O banimento é do número e costuma ser
   permanente.
 - **Use um chip descartável.** Nunca o seu número pessoal ou o da empresa.
-- **Aqueça o número.** Chip novo disparando 50 mensagens no primeiro dia é
-  banido quase na hora. O padrão embutido começa em 20/dia e sobe 10 por dia.
-- Quem responde "não quero" precisa sair da sua lista. Além de ser a regra da
-  LGPD, denúncia de usuário é o que mais acelera banimento.
-
-## Onde hospedar
-
-Qualquer lugar que rode um processo Node 24h: Railway, Render, Fly.io, ou uma
-VPS. Cerca de R$ 30 a 60 por mês. Precisa de **disco persistente** montado em
-`DADOS_DIR` — sem isso a sessão se perde a cada reinício e você refaz o QR.
+- **Comece devagar.** O padrão embutido começa em 20 mensagens/dia e sobe 10
+  por dia. Na primeira semana, prefira o intervalo de 90 a 180 segundos.
+- Quem pedir para parar de receber tem que sair da sua lista. Além da LGPD,
+  denúncia de usuário é o que mais acelera banimento.
 
 ## Variáveis
 
 | Variável | Para que serve |
 |---|---|
-| `PORTA` | porta HTTP (padrão 8080) |
-| `CHAVE` | segredo compartilhado com o app. Gere um valor longo |
 | `APP_URL` | URL do RastroLead, ex.: `https://radarlead5.netlify.app` |
-| `DADOS_DIR` | pasta persistente da sessão (padrão `./dados`) |
+| `CHAVE` | o mesmo valor de `WHATSAPP_WORKER_SECRET` na Netlify |
+| `USUARIO_ID` | seu id de usuário — aparece na tela de disparo do app |
+| `DADOS_DIR` | pasta da sessão (padrão `./dados`) |
 | `TETO_INICIAL` | mensagens no primeiro dia (padrão 20) |
 | `TETO_MAXIMO` | teto depois do aquecimento (padrão 60) |
+| `ESPERA_OCIOSO` | segundos entre consultas quando não há trabalho (padrão 8) |
 
-No RastroLead (Netlify), configure `WHATSAPP_WORKER_URL` apontando para este
-serviço e `WHATSAPP_WORKER_SECRET` com o mesmo valor de `CHAVE`.
+Na Netlify basta `WHATSAPP_WORKER_SECRET`. O `WHATSAPP_WORKER_URL` não é mais
+necessário — o app não chama o servidor.
+
+## Rodando no Termux (celular Android)
+
+```bash
+pkg update && pkg upgrade
+pkg install nodejs git
+git clone https://github.com/arthurfdossantos1-stack/playwright-mcp-example
+cd playwright-mcp-example/servidor-whatsapp
+npm install
+
+export APP_URL="https://radarlead5.netlify.app"
+export CHAVE="o-mesmo-segredo-da-netlify"
+export USUARIO_ID="seu-id-da-tela-de-disparo"
+npm start
+```
+
+Depois, no RastroLead: **Disparo automático → Gerar QR Code**. O código
+aparece na tela do app em poucos segundos — escaneie com o celular do chip
+descartável.
+
+### Para o Android não matar o processo
+
+```bash
+termux-wake-lock
+```
+
+E ainda:
+
+- Configurações do Android → Apps → Termux → Bateria → **Sem restrições**
+- Fixe o Termux na tela de apps recentes
+- **Nunca ligue o modo economia de bateria** — ele ignora o wake lock
+- Use `tmux` para a sessão sobreviver ao fechar o terminal
+
+Mesmo assim o Android pode matar o processo, principalmente da versão 14 em
+diante. Não é problema: reabra o Termux, rode `npm start` de novo e o disparo
+continua de onde parou. Enquanto estiver disparando, o melhor é **deixar a
+tela do Termux aberta**.
+
+## Rodando num servidor de verdade
+
+Qualquer lugar que rode Node 24h: Railway, Render, Fly.io, VPS. Cerca de
+R$ 30 a 60 por mês. Precisa de **disco persistente** em `DADOS_DIR`, senão a
+sessão se perde a cada reinício e você refaz o QR. A vantagem sobre o Termux
+é disparar com o celular desligado.

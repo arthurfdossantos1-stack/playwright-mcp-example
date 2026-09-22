@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { chamarWorker, ErroWorker } from "@/lib/whatsapp-worker";
 import { aplicarVariaveis, contextoDaEmpresa } from "@/lib/templates";
 import type { LeadStatus } from "@/lib/types";
 
@@ -9,8 +8,7 @@ export const runtime = "nodejs";
 
 const Entrada = z.object({
   templateId: z.string().uuid(),
-  /** Quantos leads no máximo. O servidor ainda corta pelo teto do dia. */
-  quantidade: z.coerce.number().int().min(1).max(200).default(30),
+  quantidade: z.coerce.number().int().min(1).max(200).default(20),
   intervaloMin: z.coerce.number().int().min(20).max(600).default(45),
   intervaloMax: z.coerce.number().int().min(30).max(900).default(90),
 });
@@ -29,34 +27,44 @@ type LinhaEmpresa = {
 };
 
 /**
- * Enfileira o disparo no servidor de WhatsApp.
+ * Monta o disparo e deixa gravado. Quem executa e o servidor, quando
+ * perguntar se tem trabalho.
  *
- * O texto de cada mensagem e montado AQUI, com as variaveis do template ja
- * substituidas por lead. O servidor so entrega — ele nao conhece template
- * nem banco, entao um vazamento la nao expoe os dados dos leads.
+ * O texto de cada mensagem sai daqui ja com as variaveis substituidas: o
+ * servidor so entrega. Assim ele nao precisa conhecer template nem banco, e
+ * um vazamento la nao expoe os leads.
  */
 export async function POST(request: Request) {
   const supabase = await criarClienteServidor();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ erro: "Sessão expirada." }, { status: 401 });
+  if (!user) return NextResponse.json({ erro: "Sessao expirada." }, { status: 401 });
 
   const analise = Entrada.safeParse(await request.json().catch(() => null));
   if (!analise.success) {
     return NextResponse.json(
-      { erro: analise.error.issues[0]?.message ?? "Dados inválidos." },
+      { erro: analise.error.issues[0]?.message ?? "Dados invalidos." },
       { status: 400 },
     );
   }
 
   const { templateId, quantidade, intervaloMin, intervaloMax } = analise.data;
 
+  // Um disparo ativo por vez: dois ao mesmo tempo dobram o ritmo e o risco.
+  const { data: ativo } = await supabase
+    .from("disparos")
+    .select("id")
+    .eq("user_id", user.id)
+    .in("estado", ["pendente", "rodando"])
+    .maybeSingle();
+  if (ativo) {
+    return NextResponse.json({ erro: "Ja existe um disparo em andamento." }, { status: 409 });
+  }
+
   const [{ data: template }, { data: perfil }, { data: empresas }] = await Promise.all([
     supabase.from("templates").select("*").eq("id", templateId).maybeSingle(),
     supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
-    // Mesmo criterio da fila manual: filtros na tabela principal, para o
-    // limite valer sobre o que JA passou por eles.
     supabase
       .from("empresas")
       .select(
@@ -69,20 +77,19 @@ export async function POST(request: Request) {
       .limit(quantidade),
   ]);
 
-  if (!template) {
-    return NextResponse.json({ erro: "Template não encontrado." }, { status: 400 });
-  }
+  if (!template) return NextResponse.json({ erro: "Template nao encontrado." }, { status: 400 });
 
   const meuNome = perfil?.nome ?? "";
-  const itens = ((empresas ?? []) as unknown as LinhaEmpresa[])
+  const linhas = ((empresas ?? []) as unknown as LinhaEmpresa[])
     .map((empresa) => {
       const lead = Array.isArray(empresa.leads) ? empresa.leads[0] : empresa.leads;
       if (!lead || !empresa.whatsapp_e164) return null;
       const busca = Array.isArray(empresa.buscas) ? empresa.buscas[0] : empresa.buscas;
 
       return {
-        empresaId: empresa.id,
-        leadId: lead.id,
+        user_id: user.id,
+        empresa_id: empresa.id,
+        lead_id: lead.id,
         numero: empresa.whatsapp_e164,
         texto: aplicarVariaveis(
           template.corpo,
@@ -94,46 +101,60 @@ export async function POST(request: Request) {
         ),
       };
     })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
+    .filter((l): l is NonNullable<typeof l> => l !== null);
 
-  if (itens.length === 0) {
+  if (linhas.length === 0) {
     return NextResponse.json(
-      { erro: "Nenhum lead do funil com celular válido esperando mensagem." },
+      { erro: "Nenhum lead do funil com celular valido esperando mensagem." },
       { status: 400 },
     );
   }
 
-  try {
-    const resposta = await chamarWorker<{ total: number; tetoHoje: number }>("/campanha", {
-      metodo: "POST",
-      corpo: { itens, userId: user.id, intervaloMin, intervaloMax },
-    });
-    return NextResponse.json({ ok: true, ...resposta });
-  } catch (e) {
-    const erro = e instanceof ErroWorker ? e : null;
+  const { data: disparo, error: erroDisparo } = await supabase
+    .from("disparos")
+    .insert({
+      user_id: user.id,
+      estado: "pendente",
+      intervalo_min: intervaloMin,
+      intervalo_max: Math.max(intervaloMax, intervaloMin + 10),
+    })
+    .select("id")
+    .single();
+
+  if (erroDisparo || !disparo) {
     return NextResponse.json(
-      { erro: erro?.message ?? "Falha ao iniciar o disparo." },
-      { status: erro?.status ?? 502 },
+      { erro: erroDisparo?.message ?? "Nao consegui criar o disparo." },
+      { status: 500 },
     );
   }
+
+  const { error: erroItens } = await supabase
+    .from("disparo_itens")
+    .insert(linhas.map((l) => ({ ...l, disparo_id: disparo.id })));
+
+  if (erroItens) {
+    // Disparo sem itens so confundiria a tela: desfaz.
+    await supabase.from("disparos").delete().eq("id", disparo.id);
+    return NextResponse.json({ erro: erroItens.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, total: linhas.length });
 }
 
-/** Para o disparo em andamento. */
+/** Cancela o disparo ativo. O servidor para na proxima consulta. */
 export async function DELETE() {
   const supabase = await criarClienteServidor();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ erro: "Sessão expirada." }, { status: 401 });
+  if (!user) return NextResponse.json({ erro: "Sessao expirada." }, { status: 401 });
 
-  try {
-    await chamarWorker("/campanha/parar", { metodo: "POST" });
-    return NextResponse.json({ ok: true });
-  } catch (e) {
-    const erro = e instanceof ErroWorker ? e : null;
-    return NextResponse.json(
-      { erro: erro?.message ?? "Falha ao parar o disparo." },
-      { status: erro?.status ?? 502 },
-    );
-  }
+  const { error } = await supabase
+    .from("disparos")
+    .update({ estado: "cancelado", atualizado_em: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .in("estado", ["pendente", "rodando"]);
+
+  if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
