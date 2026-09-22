@@ -1,0 +1,18 @@
+{
+  "name": "rastrolead-servidor-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servico separado que mantem a sessao do WhatsApp e dispara a fila devagar. NAO roda na Netlify: precisa de um processo ligado 24h.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "baileys": "6.7.24",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "pino": "^9.5.0"
+  }
+}

@@ -89,6 +89,13 @@ const GRUPOS: GrupoNav[] = [
         ),
       },
       {
+        href: "/app/whatsapp",
+        rotulo: "Disparo automático",
+        icone: (
+          <path d="M12.04 2c-5.5 0-9.96 4.46-9.96 9.96 0 1.76.46 3.44 1.32 4.94L2 22l5.24-1.38a9.9 9.9 0 0 0 4.8 1.22h.01c5.5 0 9.96-4.46 9.96-9.96S17.54 2 12.04 2Z" />
+        ),
+      },
+      {
         href: "/app/previas",
         rotulo: "Prévias",
         icone: (

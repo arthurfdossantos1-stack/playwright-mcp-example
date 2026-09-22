@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { criarClienteAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,8 @@ const Entrada = z.object({
   leadId: z.string().uuid().nullable().optional(),
   /** true desfaz a marcacao (botao "Desfazer" da fila). */
   desfazer: z.boolean().default(false),
+  /** So o servidor de WhatsApp manda: ele nao tem sessao de navegador. */
+  userId: z.string().uuid().optional(),
 });
 
 /**
@@ -25,21 +28,41 @@ const Entrada = z.object({
  * confirmou e reenvia no proximo carregamento.
  */
 export async function POST(request: Request) {
-  const supabase = await criarClienteServidor();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ erro: "Sessão expirada." }, { status: 401 });
-  }
-
   const analise = Entrada.safeParse(await request.json().catch(() => null));
   if (!analise.success) {
     return NextResponse.json({ erro: "Dados inválidos." }, { status: 400 });
   }
 
-  const { empresaId, leadId, desfazer } = analise.data;
+  const { empresaId, leadId, desfazer, userId } = analise.data;
+
+  // Duas portas: o navegador (sessao) e o servidor de WhatsApp (chave
+  // compartilhada). O servidor nao tem cookie, entao manda o userId e prova
+  // quem e pela chave — mesmo padrao da rota de cron.
+  const chaveWorker = process.env.WHATSAPP_WORKER_SECRET;
+  const vemDoWorker =
+    Boolean(chaveWorker) && request.headers.get("x-chave-worker") === chaveWorker;
+
+  let supabase;
+  let donoId: string;
+
+  if (vemDoWorker) {
+    if (!userId) {
+      return NextResponse.json({ erro: "userId é obrigatório." }, { status: 400 });
+    }
+    supabase = criarClienteAdmin();
+    donoId = userId;
+  } else {
+    supabase = await criarClienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ erro: "Sessão expirada." }, { status: 401 });
+    }
+    donoId = user.id;
+  }
+
+  const user = { id: donoId };
   const agora = new Date().toISOString();
 
   const { error } = await supabase
