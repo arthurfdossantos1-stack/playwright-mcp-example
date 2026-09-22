@@ -42,6 +42,8 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
   const [intervalo, setIntervalo] = useState<[number, number]>([45, 90]);
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** Quando o pedido de QR saiu daqui, para medir a espera. */
+  const [pedidoEm, setPedidoEm] = useState<number | null>(null);
 
   const consultar = useCallback(async () => {
     try {
@@ -58,6 +60,11 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
     const id = setInterval(consultar, 4000);
     return () => clearInterval(id);
   }, [consultar]);
+
+  // O QR chegou, ou a conexao abriu de primeira com a sessao salva: acabou.
+  useEffect(() => {
+    if (estado?.qr || estado?.conectado) setPedidoEm(null);
+  }, [estado?.qr, estado?.conectado]);
 
   async function acao(caminho: string, metodo: "POST" | "DELETE", corpo?: unknown) {
     setOcupado(true);
@@ -80,6 +87,16 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
   }
 
   const campanha = estado?.campanha;
+
+  /**
+   * O pedido nao e uma chamada: ele fica gravado e o servidor pega na
+   * proxima consulta. Sao tres esperas somadas — ate 8s ate o servidor
+   * perguntar, ~2s ate o WhatsApp devolver o codigo, ate 8s ate ele
+   * publicar e 4s ate esta tela ler. Sem dizer isso, os 20 segundos
+   * parecem o botao nao ter funcionado.
+   */
+  const esperandoQr = pedidoEm !== null && !estado?.qr && !estado?.conectado;
+  const segundosEsperando = pedidoEm ? Math.round((Date.now() - pedidoEm) / 1000) : 0;
 
   const rodando = campanha?.estado === "rodando" || campanha?.estado === "pendente";
 
@@ -162,6 +179,29 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
 
 
 
+        {esperandoQr && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">Pedindo o código ao servidor…</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+              O servidor pergunta por trabalho a cada 8 segundos, então o código leva até uns 20
+              para aparecer aqui. Pode deixar esta tela aberta.
+            </p>
+            {segundosEsperando > 45 && (
+              <p className="mt-2 text-sm text-amber-800">
+                Está demorando mais que o normal. Olhe o terminal do servidor — se ele parou, rode{" "}
+                <code className="font-semibold">npm start</code> de novo.
+              </p>
+            )}
+          </div>
+        )}
+
+        {!estado?.servidorVivo && !estado?.conectado && (
+          <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
+            O servidor precisa estar no ar para gerar o código — quem fala com o WhatsApp é ele,
+            não o site.
+          </p>
+        )}
+
         {estado?.qr && !estado.conectado && (
           <div className="mt-4">
             <p className="mb-2 text-sm text-slate-600">
@@ -190,11 +230,14 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
           ) : (
             <button
               type="button"
-              onClick={() => acao("/api/whatsapp/conexao", "POST", { acao: "conectar" })}
-              disabled={ocupado}
+              onClick={() => {
+                setPedidoEm(Date.now());
+                void acao("/api/whatsapp/conexao", "POST", { acao: "conectar" });
+              }}
+              disabled={ocupado || !estado?.servidorVivo}
               className="botao-primario !py-2 !text-sm"
             >
-              {ocupado ? "…" : estado?.comandoPendente ? "Pedido enviado…" : "Gerar QR Code"}
+              {ocupado ? "…" : esperandoQr ? "Pedindo o código…" : "Gerar QR Code"}
             </button>
           )}
         </div>
