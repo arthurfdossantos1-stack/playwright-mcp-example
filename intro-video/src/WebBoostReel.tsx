@@ -21,8 +21,8 @@ const starts = CUTS.map(f);
 const ends = [...starts.slice(1), f(END_SEC)];
 export const TOTAL_FRAMES = f(END_SEC);
 
-const MUSIC_VOL = 0.45;
-const DUCK = 0.47; // music multiplier while the narrator speaks
+const MUSIC_VOL = 0.65;
+const DUCK = 0.5; // music multiplier while the narrator speaks
 const duck = (fr: number) =>
   narration.segments.reduce((m, [a, b]) => {
     const d = interpolate(fr, [f(a as number) - 6, f(a as number), f(b as number), f(b as number) + 10], [1, DUCK, DUCK, 1], {

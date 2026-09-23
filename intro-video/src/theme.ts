@@ -54,7 +54,7 @@ export const brand = {
   priceValue: 300,
   days: 10,
   cta: "Saiba mais",
-  contact: "webboost.com.br  ·  (11) 99999-0000", // placeholder — replace
+  contact: "WhatsApp  (51) 99385-8465",
 };
 
 export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
