@@ -1,0 +1,24 @@
+{
+  "file": "vo/narracao-roberta-norm.mp3",
+  "voice": "ElevenLabs — Roberta (Smooth and Confident)",
+  "durationSec": 37.33,
+  "segments": [
+    [0.05, 2.0, "Seu negócio ainda não tem site?"],
+    [2.44, 4.3, "Ou tem um... que não traz cliente nenhum?"],
+    [5.21, 6.08, "A WebBoost"],
+    [6.37, 8.36, "cria sites que trabalham por você,"],
+    [8.92, 11.72, "com um design que transforma visita em venda."],
+    [12.67, 14.25, "Seu cliente pesquisa,"],
+    [14.61, 15.09, "clica..."],
+    [15.97, 16.91, "e encontra você."],
+    [17.73, 19.01, "Do design ao código,"],
+    [19.31, 20.92, "a gente cria tudo sob medida."],
+    [21.27, 22.46, "Rápido, seguro,"],
+    [22.75, 24.49, "e otimizado pra aparecer no Google."],
+    [24.94, 26.55, "E perfeito em qualquer tela:"],
+    [26.92, 29.49, "no celular, no tablet ou no computador."],
+    [29.77, 30.63, "WebBoost."],
+    [31.13, 33.35, "Sites que impulsionam resultados."],
+    [33.75, 36.99, "Chama a gente e peça já o seu orçamento!"]
+  ]
+}

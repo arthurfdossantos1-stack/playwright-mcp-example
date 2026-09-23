@@ -22,15 +22,15 @@ export const Outro: React.FC = () => {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", transform: `scale(${breathe})` }}>
           <WebBoostIcon size={250} />
           <div style={{ marginTop: 34 }}>
-            <WebBoostWordmark size={150} delay={24} />
+            <WebBoostWordmark size={150} delay={8} />
           </div>
-          <Entrance delay={40} style={{ marginTop: 22 }}>
+          <Entrance delay={44} style={{ marginTop: 22 }}>
             <div style={{ fontFamily: theme.fonts.body, fontWeight: 500, fontSize: 40, color: c.textDim, letterSpacing: "0.02em" }}>
               {brand.tagline[0]} <span style={{ color: brandColors.line }}>{brand.tagline[1]}</span>
             </div>
           </Entrance>
         </div>
-        <Entrance delay={62} config="bouncy" style={{ marginTop: 48 }}>
+        <Entrance delay={116} config="bouncy" style={{ marginTop: 48 }}>
           <div
             style={{
               padding: "24px 58px",
@@ -46,7 +46,7 @@ export const Outro: React.FC = () => {
             {brand.cta} →
           </div>
         </Entrance>
-        <Entrance delay={72} style={{ marginTop: 28 }}>
+        <Entrance delay={128} style={{ marginTop: 28 }}>
           <div style={{ fontFamily: theme.fonts.body, fontWeight: 500, fontSize: 28, color: c.textDim }}>{brand.contact}</div>
         </Entrance>
       </AbsoluteFill>

@@ -1,12 +1,17 @@
-// Synthesizes an original 26s dark-electronic bed at 120 BPM (1 beat = 0.5s).
-// Scene cuts (s): 2.5, 5, 8, 12.5, 16, 20 — kicks enter at 2.5, riser into the
-// 20s logo, impact + half-time finale on the outro.
+// Synthesizes an original 38.5s dark-electronic bed at 120 BPM (1 beat = 0.5s),
+// laid out on the narration's scene cuts (s): 5.1, 12.5, 17.4, 21, 24.8, 29.6.
+// Drone intro under the hook question, kicks from the brand line, bass from the
+// search scene, riser into the 29.6s logo, impact + half-time finale.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SR = 44100;
-const DUR = 26;
+const DUR = 38.5;
+const KICK_IN = 5.1;
+const BASS_IN = 12.5;
+const BUILD = [17.4, 21];
+const OUTRO = 29.6;
 const N = Math.floor(SR * DUR);
 const out = new Float32Array(N);
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "sfx");
@@ -48,29 +53,29 @@ const chord = (t, dur, freqs, g) =>
   });
 
 // pad drone, A minor → F major lift on the outro
-chord(0, 20.4, [110, 130.81, 164.81], 0.022);
-chord(19.9, 6.1, [87.31, 130.81, 174.61, 220], 0.02);
+chord(0, OUTRO + 0.4, [110, 130.81, 164.81], 0.022);
+chord(OUTRO - 0.1, DUR - OUTRO + 0.1, [87.31, 130.81, 174.61, 220], 0.02);
 
-// kicks 2.5 → 19.0 every beat; drop out at 19 for the riser
-for (let t = 2.5; t < 19; t += 0.5) kick(t);
-// hats on offbeats 2.5 → 19
-for (let t = 2.75; t < 19; t += 0.5) hat(t);
-// 16th hats in the build section 8 → 12.5
-for (let t = 8.125; t < 12.5; t += 0.25) hat(t, 0.05);
-// bass 8ths 5 → 19
+// kicks + offbeat hats from the brand line until the riser
+for (let t = KICK_IN; t < OUTRO - 1; t += 0.5) kick(t);
+for (let t = KICK_IN + 0.25; t < OUTRO - 1; t += 0.5) hat(t);
+// 16th hats during the build scene
+for (let t = BUILD[0] + 0.125; t < BUILD[1]; t += 0.25) hat(t, 0.05);
+// bass 8ths from the search scene
 const pat = [55, 55, 55, 55, 55, 55, 65.41, 82.41];
 for (let e = 0; ; e++) {
-  const t = 5 + e * 0.25;
-  if (t >= 19) break;
+  const t = BASS_IN + e * 0.25;
+  if (t >= OUTRO - 1) break;
   bass(t, pat[e % 8]);
 }
 // riser into the logo
-add(19, 1.0, (ts, p) => rnd() * 2 * p * p * 0.45);
-impact(20);
+add(OUTRO - 1, 1.0, (ts, p) => rnd() * 2 * p * p * 0.45);
+impact(OUTRO);
 // finale: half-time kicks + long bass notes
-for (let t = 21; t < 25; t += 1) kick(t, 0.6);
-bass(20, 43.65, 2.5);
-bass(22.5, 55, 2.3);
+for (let t = OUTRO + 1; t < DUR - 1; t += 1) kick(t, 0.6);
+bass(OUTRO, 43.65, 2.5);
+bass(OUTRO + 2.5, 55, 2.3);
+bass(OUTRO + 5, 43.65, 2.5);
 
 let peak = 0;
 for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(out[i]));

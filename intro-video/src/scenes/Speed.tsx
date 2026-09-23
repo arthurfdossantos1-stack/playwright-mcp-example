@@ -99,7 +99,7 @@ export const Speed: React.FC = () => {
               color: c.ink,
             }}
           >
-            Leve, seguro e otimizado para o Google
+            Seguro e otimizado pra aparecer no Google
           </div>
         </AbsoluteFill>
       </Exit>

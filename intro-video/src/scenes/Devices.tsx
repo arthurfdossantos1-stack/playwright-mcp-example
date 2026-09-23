@@ -36,7 +36,7 @@ export const Devices: React.FC = () => {
               }}
             />
             <WordReveal
-              text="Responsivo no celular, tablet e desktop"
+              text="No celular, no tablet ou no computador"
               delay={26}
               per={2}
               gap={9}
