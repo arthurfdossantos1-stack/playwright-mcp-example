@@ -120,6 +120,18 @@ Consequência: **clicar em "Gerar QR Code" não chama nada.** Grava um comando
 que o servidor busca depois. O código leva até ~20s para aparecer, e a tela
 precisa dizer isso, senão parece quebrado.
 
+**Queda de conexão não pausa o disparo.** Rede de celular oscila e o WhatsApp
+derruba o aparelho ligado de vez em quando. O servidor reconecta com espera
+crescente e só avisa o app depois de 3 minutos fora; `pausado` é um estado
+**retomável**, que volta a `rodando` sozinho quando o servidor reaparece.
+Exigir um clique a cada oscilação fazia o usuário criar um disparo novo por
+cima do antigo — e o mesmo lead receberia a mensagem uma vez por disparo.
+
+**Quem entra num disparo pode ser escolhido a dedo** (`empresaIds` na rota),
+ou vem do topo do radar. A lista que a tela oferece usa exatamente os mesmos
+filtros da criação do disparo: oferecer para marcar um nome que depois não
+entraria, sem explicação, é pior que não deixar escolher.
+
 **Escritas que precisam sobreviver ao app ser fechado** usam
 `fetch(..., { keepalive: true })` mais uma fila em `localStorage`
 (`src/lib/fila-pendente.ts`). O usuário sai do app para mandar a mensagem no
@@ -142,7 +154,17 @@ WhatsApp; sem isso, a marcação de contato se perde.
 - **Radar de Instagram precisa de penalidades negativas.** Sem elas, um perfil
   morto pontuava 71 e um influenciador 70.
 - **Variável nova na Netlify só entra na função no deploy.** Salvar sem
-  republicar não muda nada — vale "Clear cache and deploy site".
+  republicar não muda nada — vale "Clear cache and deploy site". E o deploy
+  automático pode simplesmente não acontecer: confira qual commit está no ar
+  antes de caçar bug numa tela que talvez nem tenha o código novo.
+- **Sessão do WhatsApp salva e recusada trava sem dizer nada.** Com credencial
+  no disco o Baileys se considera registrado e **não emite QR**; ele tenta
+  autenticar, leva 401 e reconecta, para sempre. Os códigos 401, 403, 411 e
+  500 apagam a sessão e reconectam — é isso que devolve o QR.
+- **Lead "pulado" precisa sair da fila.** Só `enviado` gravava
+  `contatado_fila_em`, então número que o WhatsApp diz não existir voltava ao
+  topo de todo disparo novo. Hoje existe `empresas.whatsapp_invalido_em`, e
+  ele entra nas **quatro** consultas que montam fila — não só na do disparo.
 - Depois de apagar uma rota, `rm -rf .next`, senão `.next/types` gera erro
   fantasma no `tsc`.
 

@@ -66,7 +66,9 @@ quando passa.
 
 ## 2. Servidor de WhatsApp (Termux, VPS, etc.)
 
-Ficam como `export` no terminal, ou num gerenciador de processos. Detalhes em
+Ficam no arquivo **`servidor-whatsapp/.env`** (copie de `.env.exemplo`). Um
+`export` no terminal também funciona e tem prioridade sobre o arquivo, mas
+vale só naquela aba: fechou o Termux, sumiu. Detalhes em
 [`servidor-whatsapp/README.md`](servidor-whatsapp/README.md).
 
 | Variável | O que faz | Padrão |
@@ -78,6 +80,7 @@ Ficam como `export` no terminal, ou num gerenciador de processos. Detalhes em
 | `TETO_INICIAL` | Mensagens no primeiro dia | 20 |
 | `TETO_MAXIMO` | Teto depois do aquecimento | 60 |
 | `ESPERA_OCIOSO` | Segundos entre consultas ao app | 8 |
+| `TOLERANCIA_QUEDA` | Segundos sem conexão antes de avisar que parou | 180 |
 
 `DADOS_DIR` guarda as credenciais da sessão: **quem tem essa pasta entra na
 conta de WhatsApp sem escanear QR nenhum.** Ela está no `.gitignore` e precisa
