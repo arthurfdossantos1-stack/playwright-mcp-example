@@ -138,6 +138,12 @@ npm start
 Só a sessão é apagada — o histórico de envios do dia, que segura o
 aquecimento, fica intacto.
 
+Se o log disser **"o site inteiro está protegido por login"**, o 401 não é a
+chave: a Netlify está exigindo login de equipe para abrir o site, e nem a
+rota pública responde. Em **Site configuration → Access & security** (ou nas
+configurações da equipe, quando a regra vale para todos os projetos), deixe a
+produção pública. Site protegido também impede qualquer pessoa de criar conta.
+
 Se o log disser **"outra cópia deste servidor assumiu a conexão"**, existe um
 `npm start` rodando em outra aba do Termux. Feche a outra antes de reiniciar:
 duas cópias se derrubam em looping, e nada deixa um número suspeito mais

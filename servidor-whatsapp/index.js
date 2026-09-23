@@ -270,6 +270,14 @@ async function diagnosticarChave() {
       );
       return;
     }
+    // Esta rota e publica de proposito. Se ELA pede autenticacao, quem esta
+    // barrando nao e o app: e uma protecao na frente do site inteiro.
+    if (r.status === 401 || r.status === 403) {
+      log.error(
+        "o site inteiro está protegido por login — nem a rota pública responde. Na Netlify: Site configuration > Access & security (ou as configurações da equipe) e deixe a produção pública.",
+      );
+      return;
+    }
     if (!r.ok) {
       log.error(`diagnóstico respondeu ${r.status}; não dá pra dizer qual é a causa.`);
       return;
