@@ -122,6 +122,18 @@ export async function POST(request: Request) {
       .select("empresa_id, lead_id")
       .maybeSingle();
 
+    // "pulado" so acontece por um motivo: o WhatsApp respondeu que o numero
+    // nao existe. Sem marcar a empresa, ela continuava elegivel — e como a
+    // fila e ordenada por score, os mesmos numeros mortos voltavam ao topo de
+    // todo disparo novo, queimando os primeiros minutos de cada rodada.
+    if (r.estado === "pulado" && item) {
+      await supabase
+        .from("empresas")
+        .update({ whatsapp_invalido_em: agora })
+        .eq("id", item.empresa_id)
+        .eq("user_id", userId);
+    }
+
     if (r.estado === "enviado" && item) {
       // Mesma marcacao da fila manual: sai da fila e avanca no funil.
       await supabase

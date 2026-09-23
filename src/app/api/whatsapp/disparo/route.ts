@@ -11,6 +11,8 @@ const Entrada = z.object({
   quantidade: z.coerce.number().int().min(1).max(200).default(20),
   intervaloMin: z.coerce.number().int().min(20).max(600).default(45),
   intervaloMax: z.coerce.number().int().min(30).max(900).default(90),
+  /** Escolha manual. Sem ela, o app pega o topo do radar. */
+  empresaIds: z.array(z.string().uuid()).max(200).optional(),
 });
 
 type LinhaEmpresa = {
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { templateId, quantidade, intervaloMin, intervaloMax } = analise.data;
+  const { templateId, quantidade, intervaloMin, intervaloMax, empresaIds } = analise.data;
 
   // Um disparo ativo por vez: dois ao mesmo tempo dobram o ritmo e o risco.
   // "pausado" conta como ativo porque ele volta sozinho quando a conexao
@@ -68,20 +70,34 @@ export async function POST(request: Request) {
     );
   }
 
-  const [{ data: template }, { data: perfil }, { data: empresas }] = await Promise.all([
-    supabase.from("templates").select("*").eq("id", templateId).maybeSingle(),
-    supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
-    supabase
-      .from("empresas")
-      .select(
-        "id, nome, telefone, whatsapp_e164, website, instagram, nota, total_avaliacoes, buscas ( nicho, cidade ), leads!inner ( id, status )",
-      )
-      .not("whatsapp_e164", "is", null)
-      .is("contatado_fila_em", null)
-      .in("leads.status", ["novo", "contatado"])
-      .order("score_radar", { ascending: false })
-      .limit(quantidade),
-  ]);
+  let consulta = supabase
+    .from("empresas")
+    .select(
+      "id, nome, telefone, whatsapp_e164, website, instagram, nota, total_avaliacoes, buscas ( nicho, cidade ), leads!inner ( id, status )",
+    )
+    .not("whatsapp_e164", "is", null)
+    .is("contatado_fila_em", null)
+    // Numero que o WhatsApp ja disse nao existir nao volta para a fila.
+    .is("whatsapp_invalido_em", null)
+    .in("leads.status", ["novo", "contatado"]);
+
+  // Escolha manual manda: quem marcou sabe quem quer chamar. Os filtros
+  // acima continuam valendo, senao um lead ja contatado voltaria pela
+  // selecao e receberia a mesma mensagem de novo.
+  consulta = empresaIds?.length
+    ? consulta.in("id", empresaIds)
+    : consulta.order("score_radar", { ascending: false }).limit(quantidade);
+
+  const [{ data: template }, { data: perfil }, { data: empresas, error: erroEmpresas }] =
+    await Promise.all([
+      supabase.from("templates").select("*").eq("id", templateId).maybeSingle(),
+      supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
+      consulta,
+    ]);
+
+  if (erroEmpresas) {
+    return NextResponse.json({ erro: erroEmpresas.message }, { status: 500 });
+  }
 
   if (!template) return NextResponse.json({ erro: "Template nao encontrado." }, { status: 400 });
 
@@ -111,7 +127,11 @@ export async function POST(request: Request) {
 
   if (linhas.length === 0) {
     return NextResponse.json(
-      { erro: "Nenhum lead do funil com celular valido esperando mensagem." },
+      {
+        erro: empresaIds?.length
+          ? "Os leads marcados ja foram contatados ou nao tem celular valido."
+          : "Nenhum lead do funil com celular valido esperando mensagem.",
+      },
       { status: 400 },
     );
   }

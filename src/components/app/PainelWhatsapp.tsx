@@ -25,6 +25,14 @@ type Estado = {
   } | null;
 };
 
+type LeadElegivel = {
+  id: string;
+  nome: string;
+  score: number;
+  semSite: boolean;
+  cidade: string | null;
+};
+
 const ROTULO_CAMPANHA: Record<string, string> = {
   pendente: "Aguardando o servidor pegar",
   rodando: "Disparando…",
@@ -39,6 +47,10 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
     templates.find((t) => t.canal === "whatsapp")?.id ?? templates[0]?.id ?? "",
   );
   const [quantidade, setQuantidade] = useState(20);
+  const [modo, setModo] = useState<"auto" | "escolher">("auto");
+  const [elegiveis, setElegiveis] = useState<LeadElegivel[] | null>(null);
+  const [escolhidos, setEscolhidos] = useState<ReadonlySet<string>>(new Set());
+  const [filtro, setFiltro] = useState("");
   const [intervalo, setIntervalo] = useState<[number, number]>([45, 90]);
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -60,6 +72,20 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
     const id = setInterval(consultar, 4000);
     return () => clearInterval(id);
   }, [consultar]);
+
+  const carregarElegiveis = useCallback(async () => {
+    try {
+      const r = await fetch("/api/whatsapp/elegiveis", { cache: "no-store" });
+      const d = (await r.json()) as { leads?: LeadElegivel[] };
+      setElegiveis(d.leads ?? []);
+    } catch {
+      setElegiveis([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (modo === "escolher" && elegiveis === null) void carregarElegiveis();
+  }, [modo, elegiveis, carregarElegiveis]);
 
   // O QR chegou, ou a conexao abriu de primeira com a sessao salva: acabou.
   useEffect(() => {
@@ -87,6 +113,24 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
   }
 
   const campanha = estado?.campanha;
+
+  const busca = filtro.trim().toLowerCase();
+  const visiveis = (elegiveis ?? []).filter(
+    (l) =>
+      !busca ||
+      l.nome.toLowerCase().includes(busca) ||
+      (l.cidade ?? "").toLowerCase().includes(busca),
+  );
+  const todosVisiveisMarcados =
+    visiveis.length > 0 && visiveis.every((l) => escolhidos.has(l.id));
+
+  function alternarLead(id: string) {
+    setEscolhidos((atual) => {
+      const proximo = new Set(atual);
+      if (!proximo.delete(id)) proximo.add(id);
+      return proximo;
+    });
+  }
 
   /**
    * O pedido nao e uma chamada: ele fica gravado e o servidor pega na
@@ -251,8 +295,8 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
       <div className="cartao p-5 sm:p-6">
         <h2 className="text-base font-bold text-slate-900">Disparo para o funil</h2>
         <p className="mt-1 text-sm leading-relaxed text-slate-600">
-          Envia para os leads do funil com celular válido que ainda não receberam mensagem, do
-          maior score para o menor.
+          Vai só para quem tem celular válido e ainda não recebeu mensagem. Ou o app escolhe
+          pelo score, ou você marca na lista quem quer chamar.
         </p>
 
         {templates.length === 0 ? (
@@ -285,24 +329,102 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
               </div>
 
               <div>
-                <label className="rotulo" htmlFor="quantidade">
-                  Quantos leads
+                <label className="rotulo" htmlFor="quem">
+                  Quem recebe
                 </label>
                 <select
-                  id="quantidade"
+                  id="quem"
                   className="campo !py-2 !text-sm"
-                  value={quantidade}
-                  onChange={(e) => setQuantidade(Number(e.target.value))}
+                  value={modo === "escolher" ? "escolher" : String(quantidade)}
+                  onChange={(e) => {
+                    if (e.target.value === "escolher") {
+                      setModo("escolher");
+                      return;
+                    }
+                    setModo("auto");
+                    setQuantidade(Number(e.target.value));
+                  }}
                   disabled={rodando}
                 >
                   {[10, 20, 30, 50].map((n) => (
                     <option key={n} value={n}>
-                      {n} leads
+                      Os {n} melhores do radar
                     </option>
                   ))}
+                  <option value="escolher">Escolher na lista</option>
                 </select>
               </div>
             </div>
+
+            {modo === "escolher" && (
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-2.5">
+                  <input
+                    type="search"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                    placeholder="Filtrar por nome ou cidade"
+                    aria-label="Filtrar leads"
+                    className="campo !min-w-[9rem] !flex-1 !py-1.5 !text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={visiveis.length === 0}
+                    onClick={() =>
+                      setEscolhidos((atual) => {
+                        const proximo = new Set(atual);
+                        for (const l of visiveis) {
+                          if (todosVisiveisMarcados) proximo.delete(l.id);
+                          else proximo.add(l.id);
+                        }
+                        return proximo;
+                      })
+                    }
+                    className="botao-secundario !px-2.5 !py-1.5 !text-xs"
+                  >
+                    {todosVisiveisMarcados ? "Desmarcar" : `Marcar ${visiveis.length}`}
+                  </button>
+                </div>
+
+                {elegiveis === null ? (
+                  <p className="p-3 text-sm text-slate-500">Carregando os leads…</p>
+                ) : visiveis.length === 0 ? (
+                  <p className="p-3 text-sm leading-relaxed text-slate-600">
+                    {elegiveis.length === 0
+                      ? "Nenhum lead do funil esperando mensagem. Quem já foi contatado, e número que o WhatsApp disse não existir, ficam fora desta lista."
+                      : "Nada com esse filtro."}
+                  </p>
+                ) : (
+                  <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
+                    {visiveis.map((l) => (
+                      <li key={l.id}>
+                        <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={escolhidos.has(l.id)}
+                            onChange={() => alternarLead(l.id)}
+                            className="h-4 w-4 shrink-0 accent-marca-500"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-slate-900">
+                              {l.nome}
+                            </span>
+                            <span className="block truncate text-xs text-slate-500">
+                              {[l.cidade, l.semSite ? "sem site" : null]
+                                .filter(Boolean)
+                                .join(" · ") || "—"}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">
+                            {l.score}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="mt-3">
               <label className="rotulo" htmlFor="intervalo">
@@ -381,18 +503,32 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
               ) : (
                 <button
                   type="button"
-                  onClick={() =>
-                    acao("/api/whatsapp/disparo", "POST", {
+                  onClick={async () => {
+                    await acao("/api/whatsapp/disparo", "POST", {
                       templateId,
                       quantidade,
                       intervaloMin: intervalo[0],
                       intervaloMax: intervalo[1],
-                    })
+                      ...(modo === "escolher" ? { empresaIds: [...escolhidos] } : {}),
+                    });
+                    // Quem entrou no disparo sai da lista: recarrega para a
+                    // proxima escolha nao mostrar quem ja foi.
+                    setEscolhidos(new Set());
+                    setElegiveis(null);
+                  }}
+                  disabled={
+                    ocupado ||
+                    !estado?.conectado ||
+                    !templateId ||
+                    (modo === "escolher" && escolhidos.size === 0)
                   }
-                  disabled={ocupado || !estado?.conectado || !templateId}
                   className="botao-primario !py-2 !text-sm"
                 >
-                  {ocupado ? "…" : "Começar disparo"}
+                  {ocupado
+                    ? "…"
+                    : modo === "escolher"
+                      ? `Começar disparo com ${escolhidos.size}`
+                      : "Começar disparo"}
                 </button>
               )}
               <Link href="/app/enviar-mensagem" className="botao-secundario !py-2 !text-sm">

@@ -44,6 +44,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       .eq("user_id", user.id)
       .not("whatsapp_e164", "is", null)
       .is("contatado_fila_em", null)
+      // Mesmo filtro da fila: contador que nao bate com a tela e pior que
+      // contador nenhum.
+      .is("whatsapp_invalido_em", null)
       .in("leads.status", ["novo", "contatado"]),
   ]);
 

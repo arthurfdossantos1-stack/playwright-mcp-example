@@ -47,6 +47,8 @@ export default async function PaginaEnviarMensagem() {
       )
       .not("whatsapp_e164", "is", null)
       .is("contatado_fila_em", null)
+      // Numero que o WhatsApp ja disse nao existir so faria perder tempo aqui.
+      .is("whatsapp_invalido_em", null)
       .in("leads.status", ["novo", "contatado"])
       .order("score_radar", { ascending: false })
       .limit(300),

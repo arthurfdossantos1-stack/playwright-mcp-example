@@ -87,6 +87,7 @@ export default async function PaginaLeads({
       .select("id, leads!inner ( status )", { count: "exact", head: true })
       .not("whatsapp_e164", "is", null)
       .is("contatado_fila_em", null)
+      .is("whatsapp_invalido_em", null)
       .in("leads.status", ["novo", "contatado"]),
     supabase
       .from("empresas")
