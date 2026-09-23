@@ -28,12 +28,14 @@ const starts = SCENES.reduce<number[]>((acc, s, i) => {
 }, []);
 export const TOTAL_FRAMES = starts[starts.length - 1] + SCENES[SCENES.length - 1].beats * BEAT;
 
-const MUSIC_VOL = 0.22;
+// Voice-over toggle: the narration (scripts/gen-voice.py) is kept but muted.
+const WITH_VOICE = false;
+const MUSIC_VOL = WITH_VOICE ? 0.22 : 0.75;
 const VO_VOL = 1;
 const DUCK = 0.3; // music level multiplier under the voice
 // smooth duck envelope: ramps down 4 frames before each line, back up after
 const duck = (f: number) =>
-  vo.lines.reduce((m, l) => {
+  !WITH_VOICE ? 1 : vo.lines.reduce((m, l) => {
     const d = interpolate(f, [l.from - 4, l.from, l.from + l.frames, l.from + l.frames + 8], [1, DUCK, DUCK, 1], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -60,9 +62,9 @@ export const WebDevIntro: React.FC = () => {
         </Sequence>
       ))}
 
-      {/* music bed: low, and ducked further while the narrator speaks */}
+      {/* music bed; ducked under the narrator when WITH_VOICE is on */}
       <Audio src={staticFile("sfx/track.wav")} volume={(f) => MUSIC_VOL * duck(f)} />
-      {vo.lines.map((l, i) => (
+      {WITH_VOICE && vo.lines.map((l, i) => (
         <Sequence key={`vo${i}`} from={l.from} durationInFrames={l.frames + 5} layout="none">
           <Audio src={staticFile(l.file)} volume={VO_VOL} />
         </Sequence>

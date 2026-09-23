@@ -37,7 +37,7 @@ const bass = (t, f, dur = 0.11, g = 1) =>
 const impact = (t) => {
   add(t, 1.2, (ts, p) => {
     const f = 60 - 25 * Math.min(1, ts * 3);
-    return Math.sin(2 * Math.PI * f * ts) * Math.exp(-p * 4) * 0.55;
+    return Math.sin(2 * Math.PI * f * ts) * Math.exp(-p * 4) * 0.9;
   });
   add(t, 0.4, (ts, p) => rnd() * 2 * Math.exp(-p * 6) * 0.3);
 };
@@ -68,9 +68,9 @@ for (let e = 0; ; e++) {
 add(19, 1.0, (ts, p) => rnd() * 2 * p * p * 0.45);
 impact(20);
 // finale: half-time kicks + long bass notes
-for (let t = 21; t < 25; t += 1) kick(t, 0.3);
-bass(20, 43.65, 2.5, 0.5);
-bass(22.5, 55, 2.3, 0.5);
+for (let t = 21; t < 25; t += 1) kick(t, 0.6);
+bass(20, 43.65, 2.5);
+bass(22.5, 55, 2.3);
 
 let peak = 0;
 for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(out[i]));
