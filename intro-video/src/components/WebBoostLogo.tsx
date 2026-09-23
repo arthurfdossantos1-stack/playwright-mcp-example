@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useId } from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { clamp, theme } from "../theme";
 
 // WebBoost mark redrawn as SVG (browser window + rocket + trail), animated.
 // Coordinates follow the original artwork; viewBox crops to the icon.
-const BRAND = { a: "#8B45F5", b: "#6A4CFF", lav: "#E6DEFF", line: "#C9B8FF", gray: "#D9D6E3" };
+const BRAND = { a: "#8B45F5", b: "#6A4CFF", lav: "#E6DEFF", line: "#C9B8FF", gray: "#D9D6E3", navy: theme.colors.navy };
+
+// unique, url()-safe ids so several logos can share a frame
+const useSvgId = () => useId().replace(/[^a-zA-Z0-9]/g, "");
 
 export const WebBoostIcon: React.FC<{ size: number; delay?: number; gap?: string }> = ({
   size,
@@ -21,20 +24,22 @@ export const WebBoostIcon: React.FC<{ size: number; delay?: number; gap?: string
   const rx = interpolate(fly, [0, 1], [-260, 0]);
   const ry = interpolate(fly, [0, 1], [200, 0]);
   const hover = Math.sin(frame / 18) * 4;
+  const uid = useSvgId();
+  const id = (n: string) => `${n}-${uid}`;
   const bar = (i: number) => ({ opacity: item(i), transform: `scaleX(${item(i)})`, transformBox: "fill-box" as const, transformOrigin: "left center" });
 
   return (
     <svg width={size} height={size * (490 / 525)} viewBox="370 238 525 490" style={{ overflow: "visible" }}>
       <defs>
-        <linearGradient id="wb-stroke" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={id("wb-stroke")} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor={BRAND.a} />
           <stop offset="1" stopColor={BRAND.b} />
         </linearGradient>
-        <linearGradient id="wb-trail" x1="0" y1="1" x2="1" y2="0">
+        <linearGradient id={id("wb-trail")} x1="0" y1="1" x2="1" y2="0">
           <stop offset="0" stopColor="#B9A3FF" stopOpacity="0" />
           <stop offset="1" stopColor="#A98BFF" stopOpacity="0.95" />
         </linearGradient>
-        <clipPath id="wb-trail-clip">
+        <clipPath id={id("wb-trail-clip")}>
           <rect x={370} y={560} width={340 * trail} height={180} />
         </clipPath>
       </defs>
@@ -47,7 +52,7 @@ export const WebBoostIcon: React.FC<{ size: number; delay?: number; gap?: string
         height={345}
         rx={34}
         fill="none"
-        stroke="url(#wb-stroke)"
+        stroke={`url(#${id("wb-stroke")})`}
         strokeWidth={24}
         pathLength={1}
         strokeDasharray={1}
@@ -57,7 +62,7 @@ export const WebBoostIcon: React.FC<{ size: number; delay?: number; gap?: string
         <circle key={cx} cx={cx} cy={312} r={11} fill={BRAND.a} opacity={item(i)} />
       ))}
       <rect x={435} y={344} width={316} height={3} rx={1.5} fill={BRAND.line} style={bar(2)} />
-      <rect x={433} y={384} width={160} height={22} rx={11} fill="url(#wb-stroke)" style={bar(3)} />
+      <rect x={433} y={384} width={160} height={22} rx={11} fill={`url(#${id("wb-stroke")})`} style={bar(3)} />
       <rect x={433} y={440} width={160} height={18} rx={9} fill={BRAND.gray} style={bar(4)} />
       <rect x={433} y={482} width={115} height={18} rx={9} fill={BRAND.gray} style={bar(5)} />
       <rect x={620} y={384} width={132} height={112} rx={14} fill={BRAND.lav} opacity={item(4)} />
@@ -65,14 +70,14 @@ export const WebBoostIcon: React.FC<{ size: number; delay?: number; gap?: string
       {/* trail */}
       <path
         d="M383 713 Q560 724 660 588 L700 622 Q585 742 383 718 Z"
-        fill="url(#wb-trail)"
-        clipPath="url(#wb-trail-clip)"
+        fill={`url(#${id("wb-trail")})`}
+        clipPath={`url(#${id("wb-trail-clip")})`}
       />
 
       {/* rocket (drawn pointing up, rotated 45° to the upper-right) */}
       <g opacity={fly} transform={`translate(${rx} ${ry + hover})`}>
         <g transform="translate(770 532) rotate(45) scale(1.16)">
-          <g stroke={gap} strokeWidth={14} strokeLinejoin="round" style={{ paintOrder: "stroke" }} fill="url(#wb-stroke)">
+          <g stroke={gap} strokeWidth={14} strokeLinejoin="round" style={{ paintOrder: "stroke" }} fill={`url(#${id("wb-stroke")})`}>
             <path d="M-50 22 L-110 84 Q-118 108 -90 103 L-44 74 Z" />
             <path d="M50 22 L110 84 Q118 108 90 103 L44 74 Z" />
             <path d="M0 -165 C72 -122 90 -20 52 76 L-52 76 C-90 -20 -72 -122 0 -165 Z" />
@@ -110,7 +115,7 @@ export const WebBoostWordmark: React.FC<{ size: number; delay?: number }> = ({ s
                     color: "transparent",
                     paddingRight: 2,
                   }
-                : { color: theme.colors.text }),
+                : { color: BRAND.navy }),
             }}
           >
             {ch}

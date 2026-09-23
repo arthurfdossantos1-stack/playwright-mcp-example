@@ -1,17 +1,18 @@
-// Synthesizes an original 38.5s dark-electronic bed at 120 BPM (1 beat = 0.5s),
-// laid out on the narration's scene cuts (s): 5.1, 12.5, 17.4, 21, 24.8, 29.6.
-// Drone intro under the hook question, kicks from the brand line, bass from the
-// search scene, riser into the 29.6s logo, impact + half-time finale.
+// Synthesizes an original 35.5s bright pop bed at 120 BPM (1 beat = 0.5s) for the
+// light WebBoost reel, laid out on the narration's scene cuts (s):
+// 5.4, 9, 12.9, 17.3, 22.6, 26.1, 29.3. Major-key pad (C–G–Am–F) + pluck arps,
+// kick/claps from the price line, bass from the quality scene, riser into the
+// ≈31s logo, impact + half-time finale.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SR = 44100;
-const DUR = 38.5;
-const KICK_IN = 5.1;
-const BASS_IN = 12.5;
-const BUILD = [17.4, 21];
-const OUTRO = 29.6;
+const DUR = 35.5;
+const KICK_IN = 5.4;
+const BASS_IN = 9.0;
+const BUILD = [17.3, 22.6];
+const OUTRO = 31.0; // logo lands (Cta scene + 50 frames)
 const N = Math.floor(SR * DUR);
 const out = new Float32Array(N);
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "sfx");
@@ -52,30 +53,51 @@ const chord = (t, dur, freqs, g) =>
     return freqs.reduce((a, f) => a + Math.sin(2 * Math.PI * f * ts) + Math.sin(2 * Math.PI * f * 1.003 * ts), 0) * env * g;
   });
 
-// pad drone, A minor → F major lift on the outro
-chord(0, OUTRO + 0.4, [110, 130.81, 164.81], 0.022);
-chord(OUTRO - 0.1, DUR - OUTRO + 0.1, [87.31, 130.81, 174.61, 220], 0.02);
+const clap = (t, g = 0.22) =>
+  add(t, 0.12, (ts, p) => {
+    const burst = ts < 0.012 || (ts > 0.018 && ts < 0.028) ? 1 : Math.exp(-(ts - 0.03) * 40);
+    return rnd() * 2 * burst * Math.exp(-p * 3) * g;
+  });
+const pluck = (t, f, g = 0.1) =>
+  add(t, 0.35, (ts, p) => (Math.sin(2 * Math.PI * f * ts) + 0.4 * Math.sin(4 * Math.PI * f * ts)) * Math.exp(-p * 6) * g);
 
-// kicks + offbeat hats from the brand line until the riser
-for (let t = KICK_IN; t < OUTRO - 1; t += 0.5) kick(t);
+// bright pad: C – G – Am – F, 2s per chord, loops to the logo, then C major
+const PROG = [
+  [130.81, 164.81, 196.0, 261.63], // C
+  [98.0, 146.83, 196.0, 246.94], // G
+  [110.0, 130.81, 164.81, 220.0], // Am
+  [87.31, 130.81, 174.61, 220.0], // F
+];
+for (let k = 0, t = 0; t < OUTRO - 0.1; k++, t += 2) chord(t, Math.min(2.4, OUTRO + 0.3 - t), PROG[k % 4], 0.016);
+chord(OUTRO - 0.1, DUR - OUTRO + 0.1, [130.81, 164.81, 196.0, 261.63, 329.63], 0.016);
+// pluck arpeggio (8ths) over the chords, from the start
+for (let e = 0; ; e++) {
+  const t = 0.25 + e * 0.25;
+  if (t >= OUTRO - 1) break;
+  const ch = PROG[Math.floor(t / 2) % 4];
+  pluck(t, ch[(e % 4)] * 2, 0.07);
+}
+
+// kicks + claps (2 & 4) + offbeat hats from the price line until the riser
+for (let t = KICK_IN; t < OUTRO - 1; t += 0.5) kick(t, 0.75);
+for (let t = KICK_IN + 0.5; t < OUTRO - 1; t += 1) clap(t);
 for (let t = KICK_IN + 0.25; t < OUTRO - 1; t += 0.5) hat(t);
-// 16th hats during the build scene
+// 16th hats during the search/chat build
 for (let t = BUILD[0] + 0.125; t < BUILD[1]; t += 0.25) hat(t, 0.05);
-// bass 8ths from the search scene
-const pat = [55, 55, 55, 55, 55, 55, 65.41, 82.41];
+// bass 8ths following the chord roots
 for (let e = 0; ; e++) {
   const t = BASS_IN + e * 0.25;
   if (t >= OUTRO - 1) break;
-  bass(t, pat[e % 8]);
+  bass(t, PROG[Math.floor(t / 2) % 4][0] / 2);
 }
 // riser into the logo
-add(OUTRO - 1, 1.0, (ts, p) => rnd() * 2 * p * p * 0.45);
+add(OUTRO - 1, 1.0, (ts, p) => rnd() * 2 * p * p * 0.4);
 impact(OUTRO);
-// finale: half-time kicks + long bass notes
-for (let t = OUTRO + 1; t < DUR - 1; t += 1) kick(t, 0.6);
-bass(OUTRO, 43.65, 2.5);
-bass(OUTRO + 2.5, 55, 2.3);
-bass(OUTRO + 5, 43.65, 2.5);
+// finale: half-time kicks + claps, long C bass
+for (let t = OUTRO + 1; t < DUR - 1; t += 1) kick(t, 0.5);
+for (let t = OUTRO + 1.5; t < DUR - 1; t += 2) clap(t, 0.18);
+bass(OUTRO, 65.41, 2.5);
+bass(OUTRO + 2.5, 65.41, 2);
 
 let peak = 0;
 for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(out[i]));

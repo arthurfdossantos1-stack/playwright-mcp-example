@@ -1,14 +1,7 @@
 import React from "react";
 import { Composition } from "remotion";
-import { WebDevIntro, TOTAL_FRAMES } from "./WebDevIntro";
+import { WebBoostReel, FPS, TOTAL_FRAMES } from "./WebBoostReel";
 
 export const Root: React.FC = () => (
-  <Composition
-    id="WebDevIntro"
-    component={WebDevIntro}
-    durationInFrames={TOTAL_FRAMES}
-    fps={30}
-    width={1920}
-    height={1080}
-  />
+  <Composition id="WebBoostReel" component={WebBoostReel} durationInFrames={TOTAL_FRAMES} fps={FPS} width={1080} height={1920} />
 );

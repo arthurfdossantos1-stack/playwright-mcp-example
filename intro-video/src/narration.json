@@ -1,24 +1,18 @@
 {
-  "file": "vo/narracao-roberta-norm.mp3",
-  "voice": "ElevenLabs — Roberta (Smooth and Confident)",
-  "durationSec": 37.33,
+  "file": "vo/narracao-reel.mp3",
+  "voice": "Google AI Studio (Gemini TTS), roteiro Reel WebBoost",
+  "durationSec": 34.24,
   "segments": [
-    [0.05, 2.0, "Seu negócio ainda não tem site?"],
-    [2.44, 4.3, "Ou tem um... que não traz cliente nenhum?"],
-    [5.21, 6.08, "A WebBoost"],
-    [6.37, 8.36, "cria sites que trabalham por você,"],
-    [8.92, 11.72, "com um design que transforma visita em venda."],
-    [12.67, 14.25, "Seu cliente pesquisa,"],
-    [14.61, 15.09, "clica..."],
-    [15.97, 16.91, "e encontra você."],
-    [17.73, 19.01, "Do design ao código,"],
-    [19.31, 20.92, "a gente cria tudo sob medida."],
-    [21.27, 22.46, "Rápido, seguro,"],
-    [22.75, 24.49, "e otimizado pra aparecer no Google."],
-    [24.94, 26.55, "E perfeito em qualquer tela:"],
-    [26.92, 29.49, "no celular, no tablet ou no computador."],
-    [29.77, 30.63, "WebBoost."],
-    [31.13, 33.35, "Sites que impulsionam resultados."],
-    [33.75, 36.99, "Chama a gente e peça já o seu orçamento!"]
+    [0.3, 3.18, "Tá precisando de um site que traga cliente de verdade?"],
+    [3.52, 5.14, "Então você chegou no lugar certo."],
+    [5.67, 8.72, "Na WebBoost, seu site sai a partir de R$ 300,"],
+    [9.17, 12.58, "com design profissional, moderno e de extrema qualidade."],
+    [13.04, 16.97, "Visual limpo e premium, rápido e perfeito no celular."],
+    [17.49, 18.7, "Otimizado pro Google,"],
+    [19.01, 22.41, "com WhatsApp integrado, pro seu cliente falar com você em um clique."],
+    [22.77, 25.82, "E o melhor: seu site fica pronto em até 10 dias."],
+    [26.31, 28.97, "Preço acessível, qualidade e segurança."],
+    [29.51, 32.77, "Clica em \"Saiba mais\" e vem fazer o seu site com a WebBoost."],
+    [33.28, 33.89, "Tô te esperando!"]
   ]
 }

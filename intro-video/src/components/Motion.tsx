@@ -80,7 +80,7 @@ export const WordReveal: React.FC<{
               opacity: p,
               filter: `blur(${(1 - p) * 8}px)`,
               transform: `translateY(${interpolate(p, [0, 1], [36, 0])}px)`,
-              color: i === highlight ? highlightColor ?? theme.colors.primarySoft : undefined,
+              color: i === highlight ? highlightColor ?? theme.colors.primary : undefined,
             }}
           >
             {word}

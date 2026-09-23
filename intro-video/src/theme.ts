@@ -10,20 +10,23 @@ import "@fontsource/inter/600.css";
 import "@fontsource/jetbrains-mono/400.css";
 
 export const theme = {
+  // Light, Apple-style palette. Violet is the hero — max one hero element per frame.
   colors: {
-    bg: "#05040A",
-    bgAlt: "#0E0C1A",
-    surface: "#13111F",
-    line: "rgba(255,255,255,0.08)",
-    primary: "#7C4DFF", // hero violet — max one hero element per frame
+    bg: "#F7F6FB",
+    bgAlt: "#EFEDF6",
+    surface: "#FFFFFF",
+    line: "rgba(21,19,31,0.08)",
+    primary: "#7C4DFF",
     primarySoft: "#A58BFF",
-    blue: "#3B2BFF",
-    accent: "#FF7A2F", // warm rim light, like the reference
-    text: "#F5F4FA",
-    textDim: "#9B98AE",
-    light: "#F7F6FB",
-    ink: "#15131F",
-    glow: "rgba(124, 77, 255, 0.45)",
+    blue: "#5B3CFF",
+    lav: "#EEE8FF",
+    navy: "#1B1F3B", // "Web" in the logo
+    text: "#15131F",
+    textDim: "#6B6880",
+    success: "#22C55E",
+    glow: "rgba(124, 77, 255, 0.35)",
+    shadow: "0 40px 80px -30px rgba(60,30,160,0.28), 0 10px 24px -10px rgba(21,19,31,0.14)",
+    shadowSm: "0 16px 36px -14px rgba(60,30,160,0.25), 0 4px 10px -4px rgba(21,19,31,0.10)",
   },
   fonts: {
     display: "Poppins",
@@ -47,9 +50,11 @@ export const brand = {
   name: "WebBoost",
   url: "www.seunegocio.com.br", // the client's site shown in the demo scenes
   tagline: ["Sites que impulsionam", "resultados."], // 2nd part in brand violet
-  cta: "Peça seu orçamento",
+  price: "R$ 300",
+  priceValue: 300,
+  days: 10,
+  cta: "Saiba mais",
   contact: "webboost.com.br  ·  (11) 99999-0000", // placeholder — replace
-
 };
 
 export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
