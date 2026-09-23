@@ -24,6 +24,12 @@ export type Pais = {
    * Recebe o número já sem DDI e sem formatação.
    */
   celular: (nacional: string) => boolean;
+  /**
+   * Regra propria para paises onde o tamanho nao separa movel de fixo.
+   * Recebe os digitos crus e devolve o E.164 discavel, ou null quando o
+   * numero nao serve para WhatsApp. Quando existe, substitui `celular`.
+   */
+  paraE164?: (digitos: string) => string | null;
   exemploCidade: string;
   /** Nichos de exemplo, escritos no idioma do país. */
   sugestoes: string[];
@@ -169,6 +175,7 @@ export const PAISES: Pais[] = [
     digitosNacionais: [10],
     // Não há prefixo de móvel: aceita qualquer número válido de 10 dígitos
     // (área e central não podem começar com 0 ou 1).
+    // Como no Mexico, o plano de numeracao dos EUA nao separa movel de fixo.
     celular: (n) => n.length === 10 && /^[2-9]\d{2}[2-9]\d{6}$/.test(n),
     exemploCidade: "Miami, FL",
     comArtigo: "dos Estados Unidos",
@@ -206,6 +213,9 @@ export const PAISES: Pais[] = [
     idioma: "es-MX",
     ddi: "52",
     digitosNacionais: [10],
+    // No Mexico o numero nao diz se e movel: desde 2019 fixo e celular tem
+    // os mesmos 10 digitos, sem prefixo que separe. Entao aqui so da para
+    // conferir o formato, e a lista vai ter fixo no meio.
     celular: (n) => n.length === 10 && /^[1-9]/.test(n),
     exemploCidade: "Guadalajara",
     comArtigo: "do México",
@@ -238,7 +248,36 @@ export const PAISES: Pais[] = [
     idioma: "es-AR",
     ddi: "54",
     digitosNacionais: [10],
-    celular: (n) => n.length === 10 && /^[1-9]/.test(n),
+    // Nunca chamada: paraE164 abaixo assume. Na Argentina o tamanho nao
+    // separa movel de fixo, entao uma regra de digitos aceitaria os dois.
+    celular: () => false,
+    /**
+     * Argentina marca movel de dois jeitos, e nenhum e o tamanho.
+     *
+     * Nacional: 0 + AREA + 15 + NUMERO. Internacional: +54 9 AREA NUMERO.
+     * Sem essas marcas o numero e linha fixa — e fixo com WhatsApp e raro.
+     * Pior: o WhatsApp "mobiliza" um fixo sozinho, respondendo que existe
+     * para o celular de mesmos digitos, que e de OUTRA pessoa. Mandar
+     * mensagem ali nao e so inutil, e abordar um estranho.
+     */
+    paraE164: (digitos) => {
+      if (digitos.startsWith("549") && digitos.length === 13) return digitos;
+      // +54 com 10 nacionais e fixo: nao tem a marca de movel.
+      if (digitos.startsWith("54") && digitos.length === 12) return null;
+
+      const n = digitos.startsWith("0") ? digitos.slice(1) : digitos;
+
+      // AREA + "15" + NUMERO da 12 digitos. A area tem 2, 3 ou 4 — na
+      // duvida vale a menor, que cobre Buenos Aires e as capitais.
+      if (n.length === 12) {
+        for (const area of [2, 3, 4]) {
+          if (n.slice(area, area + 2) === "15") {
+            return `549${n.slice(0, area)}${n.slice(area + 2)}`;
+          }
+        }
+      }
+      return null;
+    },
     exemploCidade: "Buenos Aires",
     comArtigo: "da Argentina",
     regioes: [

@@ -29,7 +29,16 @@ export function validarWhatsapp(
   if (!telefone) return { e164: null, verificado: false };
 
   const pais = acharPais(codigoPais);
-  let digitos = telefone.replace(/\D/g, "");
+  const crus = telefone.replace(/\D/g, "");
+
+  // Pais com regra propria decide sozinho: contar digitos nao resolve onde
+  // movel e fixo tem o mesmo tamanho.
+  if (pais.paraE164) {
+    const e164 = pais.paraE164(crus);
+    return e164 ? { e164, verificado: true } : { e164: null, verificado: false };
+  }
+
+  let digitos = crus;
 
   // Já veio com o DDI na frente: separa para validar só a parte nacional.
   if (digitos.startsWith(pais.ddi)) {
