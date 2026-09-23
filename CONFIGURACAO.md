@@ -71,11 +71,15 @@ reprova o deploy se achar algum. Ela vai achar: `NEXT_PUBLIC_SUPABASE_URL` e
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` **existem para ir ao navegador** — é isso que
 o prefixo `NEXT_PUBLIC_` significa. O scanner não sabe disso.
 
-Declare quais são públicas de propósito, como mais uma variável:
+Isso **já está resolvido no repositório**, em `netlify.toml`:
 
+```toml
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,..."
 ```
-SECRETS_SCAN_OMIT_KEYS=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL
-```
+
+Ele fica no repositório, e não no painel, porque o projeto da Netlify já foi
+apagado e recriado uma vez — e tudo que estava só no painel se perdeu junto.
 
 **Não use `SECRETS_SCAN_ENABLED=false`.** Desligar tudo tira a única rede de
 proteção que pegaria a `SUPABASE_SERVICE_ROLE_KEY` vazando para o pacote do

@@ -1,0 +1,22 @@
+# Configuracao de build da Netlify.
+#
+# Ela mora no repositorio de proposito: o projeto na Netlify ja foi apagado e
+# recriado uma vez, e tudo que estava so no painel se perdeu junto. O que
+# esta aqui volta sozinho no proximo deploy.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # O scanner de segredos reprova o build quando acha o valor de uma variavel
+  # no resultado. Ele vai achar estas: o prefixo NEXT_PUBLIC_ e exatamente o
+  # que manda o Next embutir o valor no pacote do navegador. Elas sao
+  # publicas por desenho — a anon key do Supabase so funciona com as regras
+  # de RLS por cima, e a URL do projeto aparece em toda requisicao.
+  #
+  # A varredura continua ligada para todo o resto. E ela que pegaria a
+  # SUPABASE_SERVICE_ROLE_KEY indo parar no pacote do navegador, que e o
+  # acidente que entregaria o banco inteiro. Por isso a lista nomeia chaves
+  # em vez de desligar o scanner com SECRETS_SCAN_ENABLED=false.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_TURNSTILE_SITE_KEY"
