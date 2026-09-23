@@ -52,14 +52,20 @@ export async function POST(request: Request) {
   const { templateId, quantidade, intervaloMin, intervaloMax } = analise.data;
 
   // Um disparo ativo por vez: dois ao mesmo tempo dobram o ritmo e o risco.
-  const { data: ativo } = await supabase
+  // "pausado" conta como ativo porque ele volta sozinho quando a conexao
+  // reaparece — sem isso, cada queda de rede virava um disparo novo por cima
+  // do antigo, e o mesmo lead receberia a mensagem uma vez por disparo.
+  const { data: ativos } = await supabase
     .from("disparos")
     .select("id")
     .eq("user_id", user.id)
-    .in("estado", ["pendente", "rodando"])
-    .maybeSingle();
-  if (ativo) {
-    return NextResponse.json({ erro: "Ja existe um disparo em andamento." }, { status: 409 });
+    .in("estado", ["pendente", "rodando", "pausado"])
+    .limit(1);
+  if (ativos && ativos.length > 0) {
+    return NextResponse.json(
+      { erro: "Ja existe um disparo em andamento. Use \"Parar agora\" antes de comecar outro." },
+      { status: 409 },
+    );
   }
 
   const [{ data: template }, { data: perfil }, { data: empresas }] = await Promise.all([
@@ -153,7 +159,7 @@ export async function DELETE() {
     .from("disparos")
     .update({ estado: "cancelado", atualizado_em: new Date().toISOString() })
     .eq("user_id", user.id)
-    .in("estado", ["pendente", "rodando"]);
+    .in("estado", ["pendente", "rodando", "pausado"]);
 
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

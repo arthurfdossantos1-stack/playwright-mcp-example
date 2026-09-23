@@ -141,13 +141,25 @@ export async function POST(request: Request) {
     }
   }
 
-  // 3. Disparo ativo.
-  const { data: disparo } = await supabase
+  // 3. Disparo ativo. "pausado" entra aqui porque ele e retomavel: quem
+  // pausou foi uma queda de conexao, e ela ja passou se o servidor esta
+  // falando com a gente. Mais de um so acontece em banco antigo, entao vale
+  // o mais recente.
+  const { data: disparo, error: erroDisparo } = await supabase
     .from("disparos")
     .select("id, estado, intervalo_min, intervalo_max")
     .eq("user_id", userId)
-    .in("estado", ["pendente", "rodando"])
+    .in("estado", ["pendente", "rodando", "pausado"])
+    .order("criado_em", { ascending: false })
+    .limit(1)
     .maybeSingle();
+
+  // Banco fora do ar nao e "sem trabalho". Devolver lote vazio faria o
+  // servidor dormir como se a fila estivesse limpa, e o disparo pararia em
+  // silencio; com 503 ele reclama no log e volta a perguntar.
+  if (erroDisparo) {
+    return NextResponse.json({ erro: "Nao consegui ler o disparo." }, { status: 503 });
+  }
 
   if (!disparo) {
     return NextResponse.json({ comando, disparo: null, itens: [] });
@@ -162,13 +174,20 @@ export async function POST(request: Request) {
   }
 
   // 4. Proximo lote.
-  const { data: itens } = await supabase
+  const { data: itens, error: erroItens } = await supabase
     .from("disparo_itens")
     .select("id, numero, texto")
     .eq("disparo_id", disparo.id)
     .eq("estado", "pendente")
     .order("criado_em", { ascending: true })
     .limit(LOTE);
+
+  // Sem esta guarda, uma falha de leitura viraria lote vazio logo abaixo — e
+  // lote vazio marca o disparo como concluido. Um erro de rede encerraria uma
+  // campanha inteira que ainda tinha leads na fila.
+  if (erroItens) {
+    return NextResponse.json({ erro: "Nao consegui ler a fila." }, { status: 503 });
+  }
 
   const lote = itens ?? [];
 
@@ -180,7 +199,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ comando, disparo: null, itens: [] });
   }
 
-  if (disparo.estado === "pendente") {
+  if (disparo.estado !== "rodando") {
+    // Retoma sozinho. Exigir um clique a cada oscilacao de rede e o que
+    // fazia o usuario criar um disparo novo por cima do antigo.
     await supabase
       .from("disparos")
       .update({ estado: "rodando", atualizado_em: agora })

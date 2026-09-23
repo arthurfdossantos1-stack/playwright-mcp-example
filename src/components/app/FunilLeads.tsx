@@ -7,6 +7,7 @@ import {
   moverLead,
   registrarInteracao,
   removerLead,
+  removerLeads,
 } from "@/app/app/acoes";
 import { SeloPrioridade } from "./SeloPrioridade";
 import { SeloStatus } from "./SeloStatus";
@@ -61,7 +62,56 @@ export function FunilLeads({
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [colunaAlvo, setColunaAlvo] = useState<LeadStatus | null>(null);
   const [detalhe, setDetalhe] = useState<LeadCartao | null>(null);
+  const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(new Set());
+  const [confirmando, setConfirmando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [, iniciar] = useTransition();
+
+  function alternar(leadId: string) {
+    setConfirmando(false);
+    setSelecionados((atual) => {
+      const proximo = new Set(atual);
+      if (!proximo.delete(leadId)) proximo.add(leadId);
+      return proximo;
+    });
+  }
+
+  function alternarColuna(daColuna: LeadCartao[], jaTodos: boolean) {
+    setConfirmando(false);
+    setSelecionados((atual) => {
+      const proximo = new Set(atual);
+      for (const lead of daColuna) {
+        if (jaTodos) proximo.delete(lead.id);
+        else proximo.add(lead.id);
+      }
+      return proximo;
+    });
+  }
+
+  function excluirSelecionados() {
+    const ids = [...selecionados];
+    // Guarda a lista de antes: se o banco recusar, sumir da tela sem ter
+    // sumido de verdade e pior que o erro — o lead volta a aparecer no
+    // proximo carregamento e ninguem entende por que.
+    const antes = leads;
+
+    setLeads((atual) => atual.filter((lead) => !selecionados.has(lead.id)));
+    setSelecionados(new Set());
+    setConfirmando(false);
+    setAviso(null);
+
+    iniciar(async () => {
+      const r = await removerLeads(ids);
+      if (!r.ok) {
+        setLeads(antes);
+        setAviso(r.erro ?? "Não consegui excluir.");
+        return;
+      }
+      setAviso(
+        r.total === 1 ? "1 lead removido do funil." : `${r.total ?? ids.length} leads removidos do funil.`,
+      );
+    });
+  }
 
   function mover(leadId: string, status: LeadStatus) {
     setLeads((atual) =>
@@ -83,10 +133,70 @@ export function FunilLeads({
 
   return (
     <>
+      {selecionados.size > 0 && (
+        <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-lg">
+          <span className="text-sm font-semibold text-slate-900">
+            {selecionados.size === 1
+              ? "1 lead selecionado"
+              : `${selecionados.size} leads selecionados`}
+          </span>
+
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelecionados(new Set());
+                setConfirmando(false);
+              }}
+              className="botao-secundario !px-3 !py-1.5 !text-sm"
+            >
+              Limpar seleção
+            </button>
+
+            {/* Dois toques de propósito: excluir aqui não tem desfazer. */}
+            {confirmando ? (
+              <button
+                type="button"
+                onClick={excluirSelecionados}
+                className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+              >
+                Confirmar exclusão de {selecionados.size}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmando(true)}
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-rose-700 ring-1 ring-rose-300 transition hover:bg-rose-50"
+              >
+                Excluir selecionados
+              </button>
+            )}
+          </div>
+
+          {confirmando && (
+            <p className="w-full text-xs leading-relaxed text-slate-600">
+              Sai só do funil. A empresa continua nos resultados e no radar, então dá para
+              trazer de volta depois.
+            </p>
+          )}
+        </div>
+      )}
+
+      {aviso && (
+        <p
+          className="mb-3 rounded-lg bg-slate-100 px-3.5 py-2.5 text-sm text-slate-700"
+          role="status"
+        >
+          {aviso}
+        </p>
+      )}
+
       <div className="grid gap-3 lg:grid-cols-4">
         {LEAD_STATUS_ORDEM.map((status) => {
           const daColuna = leads.filter((lead) => lead.status === status);
           const destacada = colunaAlvo === status;
+          const todosMarcados =
+            daColuna.length > 0 && daColuna.every((lead) => selecionados.has(lead.id));
 
           return (
             <section
@@ -104,7 +214,20 @@ export function FunilLeads({
               <header className="mb-3 flex items-center gap-2 px-1">
                 <span className={`h-2 w-2 rounded-full ${CORES_COLUNA[status]}`} />
                 <h2 className="text-sm font-bold text-slate-700">{LEAD_STATUS_LABEL[status]}</h2>
-                <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
+                {daColuna.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => alternarColuna(daColuna, todosMarcados)}
+                    className="ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700"
+                  >
+                    {todosMarcados ? "Desmarcar" : "Marcar todos"}
+                  </button>
+                )}
+                <span
+                  className={`rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 ${
+                    daColuna.length === 0 ? "ml-auto" : ""
+                  }`}
+                >
                   {daColuna.length}
                 </span>
               </header>
@@ -119,15 +242,25 @@ export function FunilLeads({
                       setArrastando(null);
                       setColunaAlvo(null);
                     }}
-                    className={`cursor-grab rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition active:cursor-grabbing ${
-                      arrastando === lead.id ? "opacity-50" : "hover:shadow-md"
-                    }`}
+                    className={`cursor-grab rounded-xl border bg-white p-3 shadow-sm transition active:cursor-grabbing ${
+                      selecionados.has(lead.id)
+                        ? "border-marca-400 ring-2 ring-marca-200"
+                        : "border-slate-200"
+                    } ${arrastando === lead.id ? "opacity-50" : "hover:shadow-md"}`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setDetalhe(lead)}
-                      className="w-full text-left"
-                    >
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(lead.id)}
+                        onChange={() => alternar(lead.id)}
+                        aria-label={`Selecionar ${lead.empresa?.nome ?? "lead"}`}
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-marca-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDetalhe(lead)}
+                        className="min-w-0 flex-1 text-left"
+                      >
                       <p className="text-sm font-semibold leading-snug text-slate-900">
                         {lead.empresa?.nome ?? "Empresa removida"}
                       </p>
@@ -156,6 +289,7 @@ export function FunilLeads({
                         )}
                       </div>
                     </button>
+                    </div>
 
                     <div className="mt-2.5 flex gap-1.5 border-t border-slate-100 pt-2.5">
                       {LEAD_STATUS_ORDEM.filter((s) => s !== lead.status).map((s) => (

@@ -32,6 +32,8 @@ const TETO_INICIAL = Number(process.env.TETO_INICIAL ?? 20);
 const TETO_MAXIMO = Number(process.env.TETO_MAXIMO ?? 60);
 /** Intervalo entre consultas quando não há nada a fazer. */
 const ESPERA_OCIOSO = Number(process.env.ESPERA_OCIOSO ?? 8) * 1000;
+/** Quanto tempo sem conexão antes de avisar o app que o disparo parou. */
+const TOLERANCIA_QUEDA = Number(process.env.TOLERANCIA_QUEDA ?? 180) * 1000;
 
 const log = pino({ level: "info", transport: { target: "pino-pretty" } });
 
@@ -47,6 +49,9 @@ let qrAtual = null;
 let conectado = false;
 let numeroConectado = null;
 let pausar = null;
+/** Desde quando está fora do ar, para separar oscilação de queda de verdade. */
+let caiuEm = null;
+let tentativasReconexao = 0;
 const resultadosPendentes = [];
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -113,6 +118,8 @@ async function conectar() {
 
     if (connection === "open") {
       conectado = true;
+      caiuEm = null;
+      tentativasReconexao = 0;
       qrAtual = null;
       numeroConectado = socket.user?.id?.split(":")[0] ?? null;
       log.info({ numeroConectado }, "conectado");
@@ -120,16 +127,26 @@ async function conectar() {
 
     if (connection === "close") {
       conectado = false;
-      const deslogado = lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut;
-      log.warn({ deslogado }, "conexão caiu");
-      // Seguir enviando sem conexão é o caminho curto pro banimento.
-      pausar = "conexão do WhatsApp caiu";
+      caiuEm ??= Date.now();
       socket = null;
-      if (!deslogado) setTimeout(() => conectar().catch(() => {}), 5000);
-      else {
+
+      if (lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
+        log.error("sessão encerrada no celular — precisa ler o QR de novo");
+        pausar = "a sessão do WhatsApp foi encerrada no celular";
         numeroConectado = null;
         qrAtual = null;
+        return;
       }
+
+      // Queda passageira aqui é a regra, não a exceção: rede de celular
+      // oscila e o WhatsApp derruba o aparelho ligado de tempos em tempos.
+      // Avisar o app a cada uma delas pausava o disparo inteiro e obrigava a
+      // clicar de novo — foi assim que quatro disparos orfaos apareceram no
+      // banco. Agora ele so reconecta, e o disparo espera parado.
+      const espera = Math.min(60_000, 5_000 * 2 ** tentativasReconexao);
+      tentativasReconexao += 1;
+      log.warn({ tentarEmSegundos: Math.round(espera / 1000) }, "conexão caiu, reconectando");
+      setTimeout(() => conectar().catch((e) => log.error({ e }, "falha ao reconectar")), espera);
     }
   });
 }
@@ -254,7 +271,7 @@ async function enviarItem(item) {
     const [existe] = await socket.onWhatsApp(item.numero);
     if (!existe?.exists) {
       resultadosPendentes.push({ itemId: item.id, estado: "pulado", motivo: "não tem WhatsApp" });
-      return true;
+      return "pulado";
     }
 
     // O JID de verdade vem daqui, e no Brasil ele quase nunca e o numero que
@@ -266,12 +283,21 @@ async function enviarItem(item) {
     registrarEnvio();
     resultadosPendentes.push({ itemId: item.id, estado: "enviado" });
     log.info({ numero: item.numero, jid }, "enviada");
-    return true;
+    return "enviado";
   } catch (e) {
     const motivo = String(e?.message ?? e).slice(0, 300);
+
+    // Conexão que cai no meio do envio não é o lead recusando: o item fica
+    // pendente e volta no próximo lote. Marcar como falha perderia o lead e
+    // ainda contaria como sinal de bloqueio, que é outra coisa.
+    if (!conectado || !socket) {
+      log.warn({ motivo }, "conexão caiu no envio — o lead volta para a fila");
+      return "semConexao";
+    }
+
     log.error({ motivo }, "falha ao enviar");
     resultadosPendentes.push({ itemId: item.id, estado: "falhou", motivo });
-    return false;
+    return "falhou";
   }
 }
 
@@ -338,7 +364,12 @@ async function laco() {
     }
 
     if (!conectado) {
-      pausar = "WhatsApp não está conectado";
+      // Só vira "parou" depois da tolerância. Antes disso é oscilação, e o
+      // disparo continua de pé esperando a reconexão.
+      const foraHa = caiuEm ? Date.now() - caiuEm : 0;
+      if (foraHa > TOLERANCIA_QUEDA) {
+        pausar = `sem conexão há ${Math.round(foraHa / 1000)}s`;
+      }
       await dormir(ESPERA_OCIOSO);
       continue;
     }
@@ -358,8 +389,12 @@ async function laco() {
       continue;
     }
 
-    const ok = await enviarItem(item);
-    falhasSeguidas = ok ? 0 : falhasSeguidas + 1;
+    const resultado = await enviarItem(item);
+    if (resultado === "semConexao") {
+      await dormir(ESPERA_OCIOSO);
+      continue;
+    }
+    falhasSeguidas = resultado === "falhou" ? falhasSeguidas + 1 : 0;
     // Três falhas seguidas quase sempre é bloqueio começando.
     if (falhasSeguidas >= 3) {
       pausar = "três falhas seguidas — pode ser bloqueio";

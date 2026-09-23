@@ -28,7 +28,7 @@ type Estado = {
 const ROTULO_CAMPANHA: Record<string, string> = {
   pendente: "Aguardando o servidor pegar",
   rodando: "Disparando…",
-  pausado: "Disparo pausado",
+  pausado: "Pausado — volta sozinho",
   concluido: "Disparo concluído",
   cancelado: "Disparo cancelado",
 };
@@ -98,7 +98,12 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
   const esperandoQr = pedidoEm !== null && !estado?.qr && !estado?.conectado;
   const segundosEsperando = pedidoEm ? Math.round((Date.now() - pedidoEm) / 1000) : 0;
 
-  const rodando = campanha?.estado === "rodando" || campanha?.estado === "pendente";
+  // Pausado continua sendo um disparo ativo: ele volta sozinho quando a
+  // conexao reaparece, entao o botao aqui tem que ser "Parar agora".
+  const rodando =
+    campanha?.estado === "rodando" ||
+    campanha?.estado === "pendente" ||
+    campanha?.estado === "pausado";
 
   return (
     <div className="space-y-5">
@@ -341,8 +346,9 @@ export function PainelWhatsapp({ templates }: { templates: Template[] }) {
                 </div>
                 {campanha.estado === "pausado" && (
                   <p className="mt-1.5 text-sm text-amber-800">
-                    O servidor pausou — normalmente é a conexão caindo ou o teto do dia. Ele
-                    retoma sozinho quando reconectar.
+                    Parado por falta de conexão ou por ter batido o teto do dia.{" "}
+                    <strong>Ele volta sozinho</strong> assim que o servidor reconectar — não
+                    precisa começar um disparo novo.
                   </p>
                 )}
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">

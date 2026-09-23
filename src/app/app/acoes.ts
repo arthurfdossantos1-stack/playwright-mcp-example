@@ -266,6 +266,35 @@ export async function removerLead(leadId: string): Promise<Resposta> {
   }
 }
 
+/**
+ * Remove varios leads de uma vez.
+ *
+ * Apaga so a ficha do funil: a empresa continua nos resultados e no radar,
+ * entao um lead removido por engano volta pelo botao de sempre.
+ */
+export async function removerLeads(ids: string[]): Promise<Resposta & { total?: number }> {
+  try {
+    if (ids.length === 0) return { ok: true, total: 0 };
+    const { supabase, user } = await exigirUsuario();
+
+    // O count fecha o ciclo na tela: apagar 8 e a tela dizer 8 e a unica
+    // forma de perceber que um deles ja tinha sumido em outra aba.
+    const { error, count } = await supabase
+      .from("leads")
+      .delete({ count: "exact" })
+      .in("id", ids)
+      .eq("user_id", user.id);
+    if (error) throw error;
+
+    revalidatePath("/app/leads");
+    revalidatePath("/app/radar");
+    revalidatePath("/app/enviar-mensagem");
+    return { ok: true, total: count ?? 0 };
+  } catch (e) {
+    return falha(e);
+  }
+}
+
 export async function registrarInteracao(
   leadId: string,
   titulo: string,
