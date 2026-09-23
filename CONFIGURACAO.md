@@ -64,6 +64,28 @@ quando passa.
 
 ---
 
+### O build falha com "secrets scanning"
+
+A Netlify varre o resultado do build atrás dos valores das suas variáveis e
+reprova o deploy se achar algum. Ela vai achar: `NEXT_PUBLIC_SUPABASE_URL` e
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` **existem para ir ao navegador** — é isso que
+o prefixo `NEXT_PUBLIC_` significa. O scanner não sabe disso.
+
+Declare quais são públicas de propósito, como mais uma variável:
+
+```
+SECRETS_SCAN_OMIT_KEYS=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL
+```
+
+**Não use `SECRETS_SCAN_ENABLED=false`.** Desligar tudo tira a única rede de
+proteção que pegaria a `SUPABASE_SERVICE_ROLE_KEY` vazando para o pacote do
+navegador — e essa sim seria catastrófica. A lista acima mantém a varredura
+ligada onde ela importa.
+
+Se o log reprovar alguma chave que **não** comece com `NEXT_PUBLIC_`, não
+adicione à lista: isso é um vazamento de verdade, e o certo é descobrir por
+que ela foi parar no pacote.
+
 ## 2. Servidor de WhatsApp (Termux, VPS, etc.)
 
 Ficam no arquivo **`servidor-whatsapp/.env`** (copie de `.env.exemplo`). Um
