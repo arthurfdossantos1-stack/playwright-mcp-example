@@ -129,16 +129,44 @@ function registrarEnvio() {
 
 // ----------------------------------------------------------- conexão
 
+const PASTA_SESSAO = path.join(DADOS_DIR, "sessao");
+
+/**
+ * Códigos em que a credencial guardada não serve mais.
+ *
+ * Este é o pior estado possível, e é silencioso: tendo credencial salva o
+ * Baileys se considera registrado e **não emite QR**. Ele fica tentando
+ * autenticar com algo que o WhatsApp recusa, num laço que nunca sai do
+ * lugar — no app a tela pede o código para sempre, e aqui o log só repete
+ * "caiu, reconectando". Apagar a sessão é o que devolve o QR.
+ */
+const SESSAO_MORTA = new Set([
+  DisconnectReason.loggedOut,
+  DisconnectReason.forbidden,
+  DisconnectReason.badSession,
+  DisconnectReason.multideviceMismatch,
+]);
+
+function apagarSessao() {
+  fs.rmSync(PASTA_SESSAO, { recursive: true, force: true });
+}
+
 async function conectar() {
   if (socket) return;
 
-  const { state, saveCreds } = await useMultiFileAuthState(path.join(DADOS_DIR, "sessao"));
+  const { state, saveCreds } = await useMultiFileAuthState(PASTA_SESSAO);
   const { version } = await fetchLatestBaileysVersion();
-  socket = makeWASocket({ version, auth: state, logger: pino({ level: "silent" }) });
+  const meu = makeWASocket({ version, auth: state, logger: pino({ level: "silent" }) });
+  socket = meu;
 
-  socket.ev.on("creds.update", saveCreds);
+  meu.ev.on("creds.update", saveCreds);
 
-  socket.ev.on("connection.update", async (u) => {
+  meu.ev.on("connection.update", async (u) => {
+    // Evento de um socket que já foi substituído não pode mexer no estado
+    // de agora: era assim que o fechamento de uma conexão velha zerava a
+    // conexão nova que acabara de subir.
+    if (socket !== meu) return;
+
     const { connection, lastDisconnect, qr } = u;
 
     if (qr) {
@@ -151,7 +179,7 @@ async function conectar() {
       caiuEm = null;
       tentativasReconexao = 0;
       qrAtual = null;
-      numeroConectado = socket.user?.id?.split(":")[0] ?? null;
+      numeroConectado = meu.user?.id?.split(":")[0] ?? null;
       log.info({ numeroConectado }, "conectado");
     }
 
@@ -160,11 +188,25 @@ async function conectar() {
       caiuEm ??= Date.now();
       socket = null;
 
-      if (lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
-        log.error("sessão encerrada no celular — precisa ler o QR de novo");
-        pausar = "a sessão do WhatsApp foi encerrada no celular";
+      const codigo = lastDisconnect?.error?.output?.statusCode;
+
+      // Codigo indefinido e queda comum de rede, nao recusa de credencial:
+      // apagar a sessao ai custaria um QR novo sem motivo.
+      if (codigo !== undefined && SESSAO_MORTA.has(codigo)) {
+        log.warn({ codigo }, "a sessão salva não vale mais — apagando para gerar um QR novo");
+        apagarSessao();
         numeroConectado = null;
         qrAtual = null;
+        tentativasReconexao = 0;
+        setTimeout(() => conectar().catch((e) => log.error({ e }, "falha ao reconectar")), 2000);
+        return;
+      }
+
+      if (codigo === DisconnectReason.connectionReplaced) {
+        // Outra cópia assumiu a conexão. Reconectar aqui faz as duas se
+        // derrubarem em looping, e nada deixa um número suspeito mais rápido.
+        log.error("outra cópia deste servidor assumiu a conexão — feche a outra antes de reiniciar");
+        pausar = "outra cópia do servidor assumiu a conexão";
         return;
       }
 
@@ -173,9 +215,15 @@ async function conectar() {
       // Avisar o app a cada uma delas pausava o disparo inteiro e obrigava a
       // clicar de novo — foi assim que quatro disparos orfaos apareceram no
       // banco. Agora ele so reconecta, e o disparo espera parado.
-      const espera = Math.min(60_000, 5_000 * 2 ** tentativasReconexao);
-      tentativasReconexao += 1;
-      log.warn({ tentarEmSegundos: Math.round(espera / 1000) }, "conexão caiu, reconectando");
+      //
+      // restartRequired e pedido do proprio WhatsApp logo depois do
+      // pareamento: esperar ali so atrasa a primeira conexao.
+      const espera =
+        codigo === DisconnectReason.restartRequired
+          ? 0
+          : Math.min(60_000, 5_000 * 2 ** tentativasReconexao);
+      if (espera) tentativasReconexao += 1;
+      log.warn({ codigo, tentarEmSegundos: Math.round(espera / 1000) }, "conexão caiu, reconectando");
       setTimeout(() => conectar().catch((e) => log.error({ e }, "falha ao reconectar")), espera);
     }
   });
@@ -191,7 +239,7 @@ async function desconectar() {
   conectado = false;
   qrAtual = null;
   numeroConectado = null;
-  fs.rmSync(path.join(DADOS_DIR, "sessao"), { recursive: true, force: true });
+  apagarSessao();
   log.info("desconectado e sessão apagada");
 }
 
@@ -333,7 +381,22 @@ async function enviarItem(item) {
 
 /** O app zera o comando ao entregar: quem le e o unico que pode agir. */
 async function aplicarComando(comando) {
-  if (comando === "conectar") await conectar().catch((e) => log.error({ e }, "falha ao conectar"));
+  if (comando === "conectar") {
+    // Pedido explícito zera o que estiver meio-morto. Com um socket travado
+    // em pé, o `if (socket) return` de conectar() engoliria o clique e a tela
+    // ficaria pedindo o código sem nunca receber. Zerar `socket` antes do
+    // end() faz o evento de fechamento do velho ser ignorado.
+    if (socket && !conectado) {
+      const velho = socket;
+      socket = null;
+      try {
+        velho.end(undefined);
+      } catch {
+        /* já estava fora */
+      }
+    }
+    await conectar().catch((e) => log.error({ e }, "falha ao conectar"));
+  }
   if (comando === "desconectar") await desconectar();
 }
 

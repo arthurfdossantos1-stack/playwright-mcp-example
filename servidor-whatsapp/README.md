@@ -116,6 +116,33 @@ deixando marcados **todos os deploy contexts** e **todos os scopes**
 deploy → Clear cache and deploy site**: na Netlify a variável entra na função
 no momento do deploy, então salvar sem republicar não muda nada.
 
+## Se o QR Code nunca aparece
+
+O sintoma é o app pedindo o código para sempre enquanto o Termux repete
+"conexão caiu, reconectando". Quase sempre é a **sessão salva que o WhatsApp
+não aceita mais** — o aparelho foi removido em *Aparelhos conectados*, ou a
+sessão expirou.
+
+Isso trava de um jeito silencioso: tendo credencial no disco, o Baileys se
+considera registrado e **não emite QR nenhum**. Ele tenta autenticar com algo
+recusado, num laço que nunca sai do lugar.
+
+O servidor detecta os códigos de recusa (401, 403, 411, 500), apaga a sessão
+sozinho e volta com um QR novo. Se mesmo assim empacar, force na mão:
+
+```bash
+rm -rf ~/playwright-mcp-example/servidor-whatsapp/dados/sessao
+npm start
+```
+
+Só a sessão é apagada — o histórico de envios do dia, que segura o
+aquecimento, fica intacto.
+
+Se o log disser **"outra cópia deste servidor assumiu a conexão"**, existe um
+`npm start` rodando em outra aba do Termux. Feche a outra antes de reiniciar:
+duas cópias se derrubam em looping, e nada deixa um número suspeito mais
+rápido.
+
 ## Rodando num servidor de verdade
 
 Qualquer lugar que rode Node 24h: Railway, Render, Fly.io, VPS. Cerca de
