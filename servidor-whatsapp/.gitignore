@@ -1,6 +1,9 @@
 # Credenciais da sessao do WhatsApp. Quem tem esta pasta entra na conta sem
 # escanear QR nenhum — ela nunca pode virar commit.
 dados/
+
+# Configuracao da maquina onde o servidor roda: tem a chave do app.
+.env
 *.env
 
 # Gerado na maquina onde o servidor roda (Termux e amd64 resolvem diferente).

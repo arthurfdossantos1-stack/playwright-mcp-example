@@ -17,12 +17,40 @@ import pino from "pino";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
 } from "baileys";
+
+/**
+ * Le o .env ao lado deste arquivo, se existir.
+ *
+ * Sem isso a configuracao so existia em `export`, que morre junto com a aba
+ * do Termux: reabrir o app dava "Faltam APP_URL, CHAVE ou USUARIO_ID" e
+ * obrigava a colar os tres de novo. Variavel ja presente no ambiente continua
+ * ganhando, pra dar pra sobrescrever num teste sem editar arquivo.
+ */
+function carregarEnv() {
+  const aqui = path.dirname(fileURLToPath(import.meta.url));
+  let texto;
+  try {
+    texto = fs.readFileSync(path.join(aqui, ".env"), "utf8");
+  } catch {
+    return;
+  }
+  for (const linha of texto.split("\n")) {
+    const par = linha.match(/^\s*([A-Za-z_][A-Za-z_0-9]*)\s*=\s*(.*)$/);
+    if (!par) continue;
+    // Aspas em volta do valor sao do formato, nao fazem parte da chave.
+    const valor = par[2].trim().replace(/^(["\'])(.*)\1$/, "$2");
+    if (process.env[par[1]] === undefined) process.env[par[1]] = valor;
+  }
+}
+
+carregarEnv();
 
 const APP_URL = (process.env.APP_URL ?? "").replace(/\/$/, "");
 const CHAVE = process.env.CHAVE ?? "";
@@ -38,7 +66,9 @@ const TOLERANCIA_QUEDA = Number(process.env.TOLERANCIA_QUEDA ?? 180) * 1000;
 const log = pino({ level: "info", transport: { target: "pino-pretty" } });
 
 if (!APP_URL || !CHAVE || !USUARIO_ID) {
-  log.error("Faltam APP_URL, CHAVE ou USUARIO_ID. Veja o README.");
+  log.error(
+    "Faltam APP_URL, CHAVE ou USUARIO_ID. Crie o arquivo servidor-whatsapp/.env a partir do .env.exemplo — assim não precisa exportar nada toda vez que abrir o Termux.",
+  );
   process.exit(1);
 }
 

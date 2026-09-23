@@ -49,11 +49,23 @@ git clone https://github.com/arthurfdossantos1-stack/playwright-mcp-example
 cd playwright-mcp-example/servidor-whatsapp
 npm install
 
-export APP_URL="https://radarlead5.netlify.app"
-export CHAVE="o-mesmo-segredo-da-netlify"
-export USUARIO_ID="seu-id-da-tela-de-disparo"
+cp .env.exemplo .env
+nano .env        # preencha APP_URL, CHAVE e USUARIO_ID
 npm start
 ```
+
+O `.env` fica gravado no celular e **não entra em commit**. Da segunda vez em
+diante, abrir o Termux e rodar isto basta:
+
+```bash
+cd ~/playwright-mcp-example/servidor-whatsapp
+termux-wake-lock
+npm start
+```
+
+Se preferir, `export APP_URL=...` continua funcionando e tem prioridade sobre
+o arquivo — útil para testar apontando para outro site sem editar nada. Só
+lembre que `export` vale apenas naquela aba: fechou o Termux, sumiu.
 
 Depois, no RastroLead: **Disparo automático → Gerar QR Code**. O código
 aparece na tela do app em poucos segundos — escaneie com o celular do chip
