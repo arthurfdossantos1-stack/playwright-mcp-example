@@ -74,7 +74,10 @@ bass(22.5, 55, 2.3);
 
 let peak = 0;
 for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(out[i]));
-const g = 0.9 / peak;
+// drive into a tanh soft-limiter for a louder, fuller bed without hard clipping
+const DRIVE = 2.2;
+const g = DRIVE / peak;
+const LIMIT = 0.95 / Math.tanh(DRIVE);
 // short fade-out
 for (let i = 0; i < N; i++) out[i] *= Math.min(1, (N - i) / (SR * 0.6));
 const buf = Buffer.alloc(44 + N * 2);
@@ -91,6 +94,6 @@ buf.writeUInt16LE(2, 32);
 buf.writeUInt16LE(16, 34);
 buf.write("data", 36);
 buf.writeUInt32LE(N * 2, 40);
-for (let i = 0; i < N; i++) buf.writeInt16LE(Math.round(Math.max(-1, Math.min(1, out[i] * g)) * 32767), 44 + i * 2);
+for (let i = 0; i < N; i++) buf.writeInt16LE(Math.round(Math.tanh(out[i] * g) * LIMIT * 32767), 44 + i * 2);
 writeFileSync(join(OUT, "track.wav"), buf);
 console.log("track.wav written");

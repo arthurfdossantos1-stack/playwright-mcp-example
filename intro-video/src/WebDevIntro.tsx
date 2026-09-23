@@ -30,7 +30,7 @@ export const TOTAL_FRAMES = starts[starts.length - 1] + SCENES[SCENES.length - 1
 
 // Voice-over toggle: the narration (scripts/gen-voice.py) is kept but muted.
 const WITH_VOICE = false;
-const MUSIC_VOL = WITH_VOICE ? 0.22 : 0.75;
+const MUSIC_VOL = WITH_VOICE ? 0.22 : 0.65;
 const VO_VOL = 1;
 const DUCK = 0.3; // music level multiplier under the voice
 // smooth duck envelope: ramps down 4 frames before each line, back up after
