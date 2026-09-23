@@ -79,7 +79,18 @@ Isso **já está resolvido no repositório**, em `netlify.toml`:
 ```
 
 Ele fica no repositório, e não no painel, porque o projeto da Netlify já foi
-apagado e recriado uma vez — e tudo que estava só no painel se perdeu junto.
+apagado e recriado — e tudo que estava só no painel se perdeu junto.
+
+**Não defina `SECRETS_SCAN_OMIT_KEYS` também no painel.** Definida lá, o
+scanner passa a tratar o valor dela como segredo e encontra esse valor dentro
+do `netlify.toml` — o build falha apontando para o arquivo que existe
+justamente para evitar a falha.
+
+E leia o log antes de mexer: ele nomeia a chave e os arquivos. Chave que
+**não** comece com `NEXT_PUBLIC_` não entra na lista sem pensar. `GEMINI_MODEL`
+entrou porque é o nome de um modelo, não um segredo — e como
+`src/lib/gemini.ts` já tem esse valor como padrão, dá para simplesmente apagar
+a variável do painel.
 
 **Não use `SECRETS_SCAN_ENABLED=false`.** Desligar tudo tira a única rede de
 proteção que pegaria a `SUPABASE_SERVICE_ROLE_KEY` vazando para o pacote do
