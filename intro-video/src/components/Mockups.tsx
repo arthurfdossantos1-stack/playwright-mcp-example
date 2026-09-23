@@ -361,24 +361,17 @@ export const PhoneMockup: React.FC<{ height: number; start?: number }> = ({ heig
   );
 };
 
-// Geometric "vertex" mark drawn in SVG, theme colors only
-export const LogoMark: React.FC<{ size: number; draw?: number }> = ({ size, draw = 1 }) => (
+// Generic placeholder mark for the demo client's site ("Seu Negócio")
+export const LogoMark: React.FC<{ size: number }> = ({ size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100">
     <defs>
       <linearGradient id="lm1" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stopColor={c.primarySoft} />
-        <stop offset="1" stopColor={c.primary} />
-      </linearGradient>
-      <linearGradient id="lm2" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor={c.primary} />
         <stop offset="1" stopColor={c.blue} />
       </linearGradient>
     </defs>
-    <g style={{ transformOrigin: "50px 50px", transform: `scale(${draw})` }}>
-      <path d="M8 14 L38 14 L56 62 L42 88 Z" fill="url(#lm1)" />
-      <path d="M92 14 L62 14 L44 62 L58 88 Z" fill="url(#lm2)" opacity={0.92} />
-      <path d="M44 62 L50 46 L56 62 L50 76 Z" fill="white" opacity={0.9} />
-    </g>
+    <rect x="6" y="6" width="88" height="88" rx="26" fill="url(#lm1)" />
+    <circle cx="50" cy="50" r="18" fill="white" opacity="0.9" />
   </svg>
 );
 

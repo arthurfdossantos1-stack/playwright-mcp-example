@@ -1,0 +1,59 @@
+{
+  "voice": "dii-high",
+  "lines": [
+    {
+      "file": "vo/line_0_bb9c5f65.wav",
+      "from": 10,
+      "frames": 55,
+      "text": "sites que trabalham por você"
+    },
+    {
+      "file": "vo/line_1_78a54c0b.wav",
+      "from": 81,
+      "frames": 46,
+      "text": "com um design que converte"
+    },
+    {
+      "file": "vo/line_2_d4869156.wav",
+      "from": 159,
+      "frames": 74,
+      "text": "seu negócio a um clique dos clientes"
+    },
+    {
+      "file": "vo/line_3_4f349a85.wav",
+      "from": 249,
+      "frames": 82,
+      "text": "do design ao código criamos tudo sob medida"
+    },
+    {
+      "file": "vo/line_4_da0c18fb.wav",
+      "from": 384,
+      "frames": 75,
+      "text": "rápido seguro e otimizado para o google"
+    },
+    {
+      "file": "vo/line_5_a3d605d5.wav",
+      "from": 489,
+      "frames": 82,
+      "text": "perfeito no celular no tablet e no computador"
+    },
+    {
+      "file": "vo/line_6_f932e919.wav",
+      "from": 609,
+      "frames": 30,
+      "text": "webboost"
+    },
+    {
+      "file": "vo/line_7_644f8890.wav",
+      "from": 645,
+      "frames": 64,
+      "text": "sites que impulsionam resultados"
+    },
+    {
+      "file": "vo/line_8_e6da7b66.wav",
+      "from": 714,
+      "frames": 49,
+      "text": "peça já o seu orçamento"
+    }
+  ]
+}

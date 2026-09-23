@@ -44,12 +44,12 @@ export const theme = {
 
 // Editable copy/brand — change here to rebrand the video.
 export const brand = {
-  name: "Vértice",
-  suffix: "Web",
-  url: "www.seunegocio.com.br",
-  tagline: "Desenvolvimento de sites profissionais",
+  name: "WebBoost",
+  url: "www.seunegocio.com.br", // the client's site shown in the demo scenes
+  tagline: ["Sites que impulsionam", "resultados."], // 2nd part in brand violet
   cta: "Peça seu orçamento",
-  contact: "vertice.web  ·  (11) 99999-0000",
+  contact: "webboost.com.br  ·  (11) 99999-0000", // placeholder — replace
+
 };
 
 export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;

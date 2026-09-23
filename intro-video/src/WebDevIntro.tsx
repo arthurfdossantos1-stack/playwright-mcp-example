@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, Audio, Sequence, staticFile } from "remotion";
+import { AbsoluteFill, Audio, Sequence, interpolate, staticFile } from "remotion";
+import vo from "./vo.json";
 import { Hook } from "./scenes/Hook";
 import { Claim } from "./scenes/Claim";
 import { Search } from "./scenes/Search";
@@ -18,7 +19,7 @@ const SCENES = [
   { C: BuildScene, beats: 9 },
   { C: Speed, beats: 7 },
   { C: Devices, beats: 8 },
-  { C: Outro, beats: 9 },
+  { C: Outro, beats: 12 },
 ] as const;
 
 const starts = SCENES.reduce<number[]>((acc, s, i) => {
@@ -26,6 +27,19 @@ const starts = SCENES.reduce<number[]>((acc, s, i) => {
   return acc;
 }, []);
 export const TOTAL_FRAMES = starts[starts.length - 1] + SCENES[SCENES.length - 1].beats * BEAT;
+
+const MUSIC_VOL = 0.22;
+const VO_VOL = 1;
+const DUCK = 0.3; // music level multiplier under the voice
+// smooth duck envelope: ramps down 4 frames before each line, back up after
+const duck = (f: number) =>
+  vo.lines.reduce((m, l) => {
+    const d = interpolate(f, [l.from - 4, l.from, l.from + l.frames, l.from + l.frames + 8], [1, DUCK, DUCK, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    return Math.min(m, d);
+  }, 1);
 
 // SFX land 2–3 frames before the visual hit
 const Sfx: React.FC<{ at: number; src: string; volume?: number }> = ({ at, src, volume = 0.6 }) => (
@@ -46,16 +60,22 @@ export const WebDevIntro: React.FC = () => {
         </Sequence>
       ))}
 
-      <Audio src={staticFile("sfx/track.wav")} volume={0.55} />
+      {/* music bed: low, and ducked further while the narrator speaks */}
+      <Audio src={staticFile("sfx/track.wav")} volume={(f) => MUSIC_VOL * duck(f)} />
+      {vo.lines.map((l, i) => (
+        <Sequence key={`vo${i}`} from={l.from} durationInFrames={l.frames + 5} layout="none">
+          <Audio src={staticFile(l.file)} volume={VO_VOL} />
+        </Sequence>
+      ))}
       {starts.slice(1).map((s, i) => (
-        <Sfx key={`w${i}`} at={s - 3} src="whoosh.wav" volume={0.45} />
+        <Sfx key={`w${i}`} at={s - 3} src="whoosh.wav" volume={0.3} />
       ))}
       {typeTicks.map((t, i) => (
-        <Sfx key={`t${i}`} at={t} src="tick.wav" volume={0.35} />
+        <Sfx key={`t${i}`} at={t} src="tick.wav" volume={0.2} />
       ))}
-      <Sfx at={searchStart + Math.round(FPS * 2.1) - 2} src="pop.wav" volume={0.8} />
-      <Sfx at={starts[4] + Math.round(FPS * 1.15) - 2} src="pop.wav" volume={0.7} />
-      <Sfx at={starts[6] - 2} src="bass.wav" volume={0.9} />
+      <Sfx at={searchStart + Math.round(FPS * 2.1) - 2} src="pop.wav" volume={0.5} />
+      <Sfx at={starts[4] + Math.round(FPS * 1.15) - 2} src="pop.wav" volume={0.45} />
+      <Sfx at={starts[6] - 2} src="bass.wav" volume={0.35} />
     </AbsoluteFill>
   );
 };

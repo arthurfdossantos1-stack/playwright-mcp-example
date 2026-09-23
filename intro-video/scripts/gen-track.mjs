@@ -1,4 +1,4 @@
-// Synthesizes an original 24.5s dark-electronic bed at 120 BPM (1 beat = 0.5s).
+// Synthesizes an original 26s dark-electronic bed at 120 BPM (1 beat = 0.5s).
 // Scene cuts (s): 2.5, 5, 8, 12.5, 16, 20 — kicks enter at 2.5, riser into the
 // 20s logo, impact + half-time finale on the outro.
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SR = 44100;
-const DUR = 24.5;
+const DUR = 26;
 const N = Math.floor(SR * DUR);
 const out = new Float32Array(N);
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "sfx");
@@ -29,15 +29,15 @@ const kick = (t, g = 0.85) =>
     return Math.sin(2 * Math.PI * f * ts) * Math.exp(-p * 7) * g;
   });
 const hat = (t, g = 0.1) => add(t, 0.045, (ts, p) => rnd() * 2 * Math.exp(-p * 10) * g);
-const bass = (t, f, dur = 0.11) =>
+const bass = (t, f, dur = 0.11, g = 1) =>
   add(t, dur, (ts, p) => {
     const env = Math.min(1, ts * 90) * Math.exp(-p * 4);
-    return (Math.sin(2 * Math.PI * f * ts) + Math.sin(2 * Math.PI * f * 3 * ts) / 3.5) * env * 0.28;
+    return (Math.sin(2 * Math.PI * f * ts) + Math.sin(2 * Math.PI * f * 3 * ts) / 3.5) * env * 0.28 * g;
   });
 const impact = (t) => {
   add(t, 1.2, (ts, p) => {
     const f = 60 - 25 * Math.min(1, ts * 3);
-    return Math.sin(2 * Math.PI * f * ts) * Math.exp(-p * 4) * 0.9;
+    return Math.sin(2 * Math.PI * f * ts) * Math.exp(-p * 4) * 0.55;
   });
   add(t, 0.4, (ts, p) => rnd() * 2 * Math.exp(-p * 6) * 0.3);
 };
@@ -49,7 +49,7 @@ const chord = (t, dur, freqs, g) =>
 
 // pad drone, A minor → F major lift on the outro
 chord(0, 20.4, [110, 130.81, 164.81], 0.022);
-chord(19.9, 4.6, [87.31, 130.81, 174.61, 220], 0.02);
+chord(19.9, 6.1, [87.31, 130.81, 174.61, 220], 0.02);
 
 // kicks 2.5 → 19.0 every beat; drop out at 19 for the riser
 for (let t = 2.5; t < 19; t += 0.5) kick(t);
@@ -68,9 +68,9 @@ for (let e = 0; ; e++) {
 add(19, 1.0, (ts, p) => rnd() * 2 * p * p * 0.45);
 impact(20);
 // finale: half-time kicks + long bass notes
-for (let t = 21; t < 23.5; t += 1) kick(t, 0.6);
-bass(20, 43.65, 2.5);
-bass(22, 55, 2.3);
+for (let t = 21; t < 25; t += 1) kick(t, 0.3);
+bass(20, 43.65, 2.5, 0.5);
+bass(22.5, 55, 2.3, 0.5);
 
 let peak = 0;
 for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(out[i]));
