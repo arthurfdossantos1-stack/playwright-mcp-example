@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   atualizarLead,
   matricularEmCadencia,
+  bloquearContato,
   moverLead,
   registrarInteracao,
   removerLead,
@@ -39,6 +40,7 @@ export type LeadCartao = {
     prioridade: PrioridadeRadar;
     /** Marca a hora em que o wa.me foi aberto pela fila. */
     contatadoFilaEm: string | null;
+    whatsappE164: string | null;
   } | null;
 };
 
@@ -403,6 +405,16 @@ function DetalheLead({
     });
   }
 
+  function naoContatar() {
+    const numero = lead.empresa?.whatsappE164;
+    if (!numero) return;
+    iniciar(async () => {
+      const resposta = await bloquearContato(numero, lead.id);
+      if (resposta.ok) aoRemover(lead.id);
+      else setMensagem(resposta.erro ?? "Não consegui registrar.");
+    });
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
@@ -547,6 +559,17 @@ function DetalheLead({
           >
             Remover do funil
           </button>
+          {lead.empresa?.whatsappE164 && (
+            <button
+              type="button"
+              onClick={naoContatar}
+              disabled={pendente}
+              className="text-sm font-medium text-slate-600 hover:underline"
+              title="Registra a recusa: o número sai de todas as filas e novas buscas não o trazem de volta"
+            >
+              Pediu para não receber
+            </button>
+          )}
           <button type="button" onClick={salvar} disabled={pendente} className="botao-primario !px-4 !py-2 !text-sm">
             {pendente ? "Salvando…" : "Salvar"}
           </button>

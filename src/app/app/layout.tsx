@@ -47,6 +47,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       // Mesmo filtro da fila: contador que nao bate com a tela e pior que
       // contador nenhum.
       .is("whatsapp_invalido_em", null)
+      // Quem pediu para nao receber fica fora de toda fila, sempre.
+      .is("bloqueado_em", null)
       .in("leads.status", ["novo", "contatado"]),
   ]);
 

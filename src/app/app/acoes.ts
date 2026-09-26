@@ -295,6 +295,47 @@ export async function removerLeads(ids: string[]): Promise<Resposta & { total?: 
   }
 }
 
+/**
+ * Registra que o contato pediu para nao receber mais mensagens.
+ *
+ * O caminho comum e este: a pessoa responde "me tira dai" no WhatsApp e quem
+ * recebeu marca aqui. Remover o lead nao bastaria — a proxima busca traria o
+ * mesmo telefone de volta. O bloqueio guarda a recusa, nao a ficha, e um
+ * gatilho no banco tira o numero na hora de qualquer disparo ja enfileirado.
+ */
+export async function bloquearContato(
+  telefoneE164: string,
+  leadId?: string,
+): Promise<Resposta> {
+  try {
+    const { supabase, user } = await exigirUsuario();
+    if (!telefoneE164) return { ok: false, erro: "Este lead não tem número." };
+
+    const { error } = await supabase
+      .from("bloqueios")
+      .upsert(
+        { telefone_e164: telefoneE164, origem: "usuario", user_id: user.id },
+        { onConflict: "telefone_e164" },
+      );
+    if (error) throw error;
+
+    if (leadId) {
+      await supabase
+        .from("leads")
+        .update({ status: "descartado" })
+        .eq("id", leadId)
+        .eq("user_id", user.id);
+    }
+
+    revalidatePath("/app/leads");
+    revalidatePath("/app/radar");
+    revalidatePath("/app/enviar-mensagem");
+    return { ok: true };
+  } catch (e) {
+    return falha(e);
+  }
+}
+
 export async function registrarInteracao(
   leadId: string,
   titulo: string,

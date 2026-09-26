@@ -35,6 +35,7 @@ const COLUNAS = [
     links: [
       { href: "/termos", rotulo: "Termos de uso" },
       { href: "/privacidade", rotulo: "Privacidade" },
+      { href: "/nao-quero-receber", rotulo: "Não quero receber" },
       { href: "/cookies", rotulo: "Cookies" },
     ],
   },

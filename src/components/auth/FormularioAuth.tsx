@@ -8,6 +8,7 @@ import { Logo } from "@/components/marketing/Logo";
 import { avaliarForcaSenha } from "@/lib/senha";
 import { useAntiRobo } from "./CampoAntiRobo";
 import { CHAVE_TURNSTILE, Turnstile } from "./Turnstile";
+import { VERSAO_TERMOS } from "@/lib/legal";
 
 type Modo = "login" | "cadastro" | "recuperar";
 
@@ -47,6 +48,7 @@ export function FormularioAuth() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [precisaConfirmar, setPrecisaConfirmar] = useState(false);
   const [tokenCaptcha, setTokenCaptcha] = useState<string | null>(null);
+  const [aceitouTermos, setAceitouTermos] = useState(false);
   const { verificar: verificarAntiRobo, campo: campoIsca } = useAntiRobo();
 
   const forca = avaliarForcaSenha(senha);
@@ -61,6 +63,7 @@ export function FormularioAuth() {
     setAviso(null);
     setConfirmacaoEmail("");
     setConfirmacaoSenha("");
+    setAceitouTermos(false);
   }
 
   async function aoEnviar(evento: React.FormEvent) {
@@ -97,12 +100,23 @@ export function FormularioAuth() {
           setErro("As senhas não conferem.");
           return;
         }
+        if (!aceitouTermos) {
+          setErro("Marque o aceite dos termos e da política de privacidade para continuar.");
+          return;
+        }
 
         const { data, error } = await supabase.auth.signUp({
           email,
           password: senha,
           options: {
-            data: { full_name: nome || null },
+            // A data e a versao do aceite viajam como metadado e o trigger do
+            // banco copia para o perfil. Gravar so "aceitou" nao serve: os
+            // documentos mudam, e depois a pergunta e qual texto ele viu.
+            data: {
+              full_name: nome || null,
+              termos_aceitos_em: new Date().toISOString(),
+              termos_versao: VERSAO_TERMOS,
+            },
             // Leva pra uma pagina de confirmacao que NAO exige sessao. O link do
             // e-mail costuma abrir no navegador interno do app de e-mail, onde a
             // sessao criada nao serve pro navegador de verdade do usuario.
@@ -417,9 +431,45 @@ export function FormularioAuth() {
 
           {modo === "cadastro" && <Turnstile aoResolver={setTokenCaptcha} />}
 
+          {modo === "cadastro" && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 p-3.5">
+              <input
+                type="checkbox"
+                checked={aceitouTermos}
+                onChange={(e) => setAceitouTermos(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-marca-500"
+              />
+              <span className="text-xs leading-relaxed text-slate-600">
+                Li e aceito os{" "}
+                <Link
+                  href="/termos"
+                  target="_blank"
+                  className="font-semibold text-marca-700 underline"
+                >
+                  Termos de uso
+                </Link>{" "}
+                e a{" "}
+                <Link
+                  href="/privacidade"
+                  target="_blank"
+                  className="font-semibold text-marca-700 underline"
+                >
+                  Política de privacidade
+                </Link>
+                , e entendo que sou o responsável pelos contatos que eu abordar pela
+                ferramenta.
+              </span>
+            </label>
+          )}
+
           <button
             type="submit"
-            disabled={carregando || emailsDivergem || senhasDivergem}
+            disabled={
+              carregando ||
+              emailsDivergem ||
+              senhasDivergem ||
+              (modo === "cadastro" && !aceitouTermos)
+            }
             className="botao-primario w-full"
           >
             {carregando
@@ -471,15 +521,8 @@ export function FormularioAuth() {
 
       {modo === "cadastro" && (
         <p className="mt-5 text-center text-xs leading-relaxed text-slate-500">
-          Ao criar a conta você concorda com os{" "}
-          <Link href="/termos" className="underline hover:text-slate-700">
-            Termos de uso
-          </Link>{" "}
-          e a{" "}
-          <Link href="/privacidade" className="underline hover:text-slate-700">
-            Política de privacidade
-          </Link>
-          .
+          Guardamos a data e a versão do que você aceitou, como exige a LGPD. Você pode pedir
+          seus dados ou a exclusão da conta quando quiser.
         </p>
       )}
 

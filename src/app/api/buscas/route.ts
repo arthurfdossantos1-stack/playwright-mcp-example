@@ -209,6 +209,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ buscaId: busca.id, total: 0, avisos });
     }
 
+    // Quem ja pediu para nao receber entra marcado. Apagar o lead nunca
+    // resolveu: a proxima busca traz o mesmo telefone de volta do Google, e
+    // a pessoa recebe outra mensagem. O que precisa persistir e a recusa.
+    const numeros = [...new Set(linhas.map((l) => l.whatsapp_e164).filter(Boolean))];
+    if (numeros.length > 0) {
+      const { data: bloqueados } = await supabase
+        .from("bloqueios")
+        .select("telefone_e164")
+        .in("telefone_e164", numeros as string[]);
+
+      const naoPerturbe = new Set((bloqueados ?? []).map((b) => b.telefone_e164));
+      if (naoPerturbe.size > 0) {
+        const agora = new Date().toISOString();
+        for (const linha of linhas) {
+          if (linha.whatsapp_e164 && naoPerturbe.has(linha.whatsapp_e164)) {
+            linha.bloqueado_em = agora;
+          }
+        }
+        avisos.push(
+          `${naoPerturbe.size} contato(s) pediram para não receber mensagens e ficaram fora das filas.`,
+        );
+      }
+    }
+
     const { error: erroEmpresas } = await supabase
       .from("empresas")
       .upsert(linhas, { onConflict: "busca_id,place_id" });

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function Termos() {
   return (
-    <PaginaLegal titulo="Termos de uso" atualizadoEm="10 de março de 2025">
+    <PaginaLegal titulo="Termos de uso" atualizadoEm="26 de setembro de 2026">
       <h2>1. Sobre estes termos</h2>
       <p>
         Estes termos regulam o uso do RastroLead, uma ferramenta de prospecção B2B que organiza

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function Privacidade() {
   return (
-    <PaginaLegal titulo="Política de privacidade" atualizadoEm="10 de março de 2025">
+    <PaginaLegal titulo="Política de privacidade" atualizadoEm="26 de setembro de 2026">
       <h2>1. Quem somos</h2>
       <p>
         O RastroLead é uma ferramenta de prospecção B2B. Esta política explica quais dados tratamos,
@@ -92,6 +92,22 @@ export default function Privacidade() {
       <p>
         Para exercer qualquer desses direitos:{" "}
         <a href="mailto:contato@rastrolead.com.br">contato@rastrolead.com.br</a>.
+      </p>
+
+      <h3>Se você recebeu uma mensagem e não quer mais</h3>
+      <p>
+        Você não precisa de conta, nem de explicar o motivo. Informe o número em{" "}
+        <a href="/nao-quero-receber">
+          <strong>rastrolead.com.br/nao-quero-receber</strong>
+        </a>{" "}
+        e ele sai na hora.
+      </p>
+      <p>
+        O pedido tem três efeitos imediatos: o número sai de qualquer envio que ainda não
+        aconteceu, novas buscas não o trazem de volta, e o bloqueio vale para{" "}
+        <strong>todos os usuários</strong> da plataforma — não só para quem entrou em contato.
+        Guardamos apenas o número, porque é o mínimo necessário para reconhecê-lo e manter a
+        recusa valendo.
       </p>
 
       <h2>7. Segurança</h2>

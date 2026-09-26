@@ -71,6 +71,7 @@ export default async function PaginaLeads({
             instagram: empresa.instagram,
             nota: empresa.nota,
             contatadoFilaEm: empresa.contatado_fila_em ?? null,
+            whatsappE164: empresa.whatsapp_e164 ?? null,
             totalAvaliacoes: empresa.total_avaliacoes,
             prioridade: empresa.prioridade,
           }
@@ -88,6 +89,8 @@ export default async function PaginaLeads({
       .not("whatsapp_e164", "is", null)
       .is("contatado_fila_em", null)
       .is("whatsapp_invalido_em", null)
+      // Quem pediu para nao receber fica fora de toda fila, sempre.
+      .is("bloqueado_em", null)
       .in("leads.status", ["novo", "contatado"]),
     supabase
       .from("empresas")

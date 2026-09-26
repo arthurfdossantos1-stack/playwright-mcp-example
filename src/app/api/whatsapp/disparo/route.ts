@@ -79,6 +79,8 @@ export async function POST(request: Request) {
     .is("contatado_fila_em", null)
     // Numero que o WhatsApp ja disse nao existir nao volta para a fila.
     .is("whatsapp_invalido_em", null)
+    // Quem pediu para nao receber fica fora de toda fila, sempre.
+    .is("bloqueado_em", null)
     .in("leads.status", ["novo", "contatado"]);
 
   // Escolha manual manda: quem marcou sabe quem quer chamar. Os filtros
