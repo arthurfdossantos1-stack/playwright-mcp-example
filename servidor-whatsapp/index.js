@@ -60,10 +60,34 @@ const TETO_INICIAL = Number(process.env.TETO_INICIAL ?? 20);
 const TETO_MAXIMO = Number(process.env.TETO_MAXIMO ?? 60);
 /** Intervalo entre consultas quando não há nada a fazer. */
 const ESPERA_OCIOSO = Number(process.env.ESPERA_OCIOSO ?? 8) * 1000;
+/** Espera depois de conectar, antes do primeiro envio. */
+const ASSENTAR = Number(process.env.ASSENTAR ?? 15) * 1000;
 /** Quanto tempo sem conexão antes de avisar o app que o disparo parou. */
 const TOLERANCIA_QUEDA = Number(process.env.TOLERANCIA_QUEDA ?? 180) * 1000;
 
 const log = pino({ level: "info", transport: { target: "pino-pretty" } });
+
+/**
+ * Cala o despejo de sessão do libsignal.
+ *
+ * Ele imprime a sessão inteira no console a cada troca de chave
+ * (session_record.js: `console.info("Closing session:", session)`). Numa
+ * rodada de disparo são centenas de blocos de vinte linhas, e o log que
+ * importa — o que diz o que foi enviado e para quem — some no meio. Nada
+ * ali é acionável: é estado interno de criptografia.
+ */
+function calarRuidoDoSignal() {
+  const RUIDO = /^(Closing session|losing session|Deleting session|Old session)/;
+  for (const nivel of ["log", "info", "warn", "error"]) {
+    const original = console[nivel].bind(console);
+    console[nivel] = (...args) => {
+      if (typeof args[0] === "string" && RUIDO.test(args[0])) return;
+      original(...args);
+    };
+  }
+}
+
+calarRuidoDoSignal();
 
 if (!APP_URL || !CHAVE || !USUARIO_ID) {
   log.error(
@@ -81,6 +105,8 @@ let numeroConectado = null;
 let pausar = null;
 /** Desde quando está fora do ar, para separar oscilação de queda de verdade. */
 let caiuEm = null;
+/** Quando a conexão abriu, para não disparar antes de ela assentar. */
+let conectadoEm = null;
 let tentativasReconexao = 0;
 const resultadosPendentes = [];
 
@@ -151,12 +177,59 @@ function apagarSessao() {
   fs.rmSync(PASTA_SESSAO, { recursive: true, force: true });
 }
 
+/**
+ * Guarda o que foi enviado, para conseguir reenviar quando pedirem.
+ *
+ * Quando o celular do destinatário não consegue descriptografar, ele pede o
+ * reenvio. O Baileys só atende esse pedido se `getMessage` devolver o
+ * conteúdo original — a documentação dele diz, com todas as letras, que é
+ * isso que "solves the 'this message can take a while' issue". Sem isso a
+ * mensagem fica para sempre como **"Aguardando mensagem"** na tela de quem
+ * deveria ler: ela chegou, mas ilegível, e ninguém do lado de cá percebe.
+ */
+const enviadasRecentes = new Map();
+/** Um processo que roda dias precisa de teto, senão o mapa vaza memória. */
+const TETO_LEMBRADAS = 300;
+
+function lembrarEnviada(id, mensagem) {
+  if (!id || !mensagem) return;
+  enviadasRecentes.set(id, mensagem);
+  if (enviadasRecentes.size > TETO_LEMBRADAS) {
+    enviadasRecentes.delete(enviadasRecentes.keys().next().value);
+  }
+}
+
+/** CacheStore mínimo, pra não trazer uma dependência só por isto. */
+function cacheEmMemoria() {
+  const itens = new Map();
+  return {
+    get: (chave) => itens.get(chave),
+    set: (chave, valor) => {
+      itens.set(chave, valor);
+    },
+    del: (chave) => {
+      itens.delete(chave);
+    },
+    flushAll: () => {
+      itens.clear();
+    },
+  };
+}
+
 async function conectar() {
   if (socket) return;
 
   const { state, saveCreds } = await useMultiFileAuthState(PASTA_SESSAO);
   const { version } = await fetchLatestBaileysVersion();
-  const meu = makeWASocket({ version, auth: state, logger: pino({ level: "silent" }) });
+  const meu = makeWASocket({
+    version,
+    auth: state,
+    logger: pino({ level: "silent" }),
+    // Os dois juntos fecham o ciclo do reenvio: o cache conta as tentativas,
+    // e getMessage entrega o conteúdo que o destinatário pediu de volta.
+    msgRetryCounterCache: cacheEmMemoria(),
+    getMessage: async (chave) => enviadasRecentes.get(chave.id),
+  });
   socket = meu;
 
   meu.ev.on("creds.update", saveCreds);
@@ -176,6 +249,7 @@ async function conectar() {
 
     if (connection === "open") {
       conectado = true;
+      conectadoEm = Date.now();
       caiuEm = null;
       tentativasReconexao = 0;
       qrAtual = null;
@@ -365,7 +439,8 @@ async function enviarItem(item) {
     // `${numero}@s.whatsapp.net` manda pra um endereco que o servidor aceita
     // e ninguem recebe — a mensagem "sai" e nao chega em lugar nenhum.
     const jid = existe.jid ?? `${item.numero}@s.whatsapp.net`;
-    await socket.sendMessage(jid, { text: item.texto });
+    const enviada = await socket.sendMessage(jid, { text: item.texto });
+    lembrarEnviada(enviada?.key?.id, enviada?.message);
     registrarEnvio();
     resultadosPendentes.push({ itemId: item.id, estado: "enviado" });
     log.info({ numero: item.numero, jid }, "enviada");
@@ -488,6 +563,15 @@ async function laco() {
       log.warn(pausar);
       await dormir(ESPERA_OCIOSO);
       continue;
+    }
+
+    // Depois de abrir, o Baileys ainda sobe pre-chaves e sincroniza estado.
+    // Mandar em cima disso produz mensagem que o destinatário não consegue
+    // abrir — e o custo de esperar é uma vez por conexão.
+    const assentando = ASSENTAR - (Date.now() - (conectadoEm ?? 0));
+    if (assentando > 0) {
+      log.info(`conexão nova, assentando por ${Math.ceil(assentando / 1000)}s`);
+      await dormir(assentando);
     }
 
     const resultado = await enviarItem(item);

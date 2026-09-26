@@ -116,6 +116,28 @@ deixando marcados **todos os deploy contexts** e **todos os scopes**
 deploy → Clear cache and deploy site**: na Netlify a variável entra na função
 no momento do deploy, então salvar sem republicar não muda nada.
 
+## Se a mensagem chega como "Aguardando mensagem"
+
+O balão aparece assim na tela de quem deveria ler:
+
+> 🕐 *Aguardando mensagem. Essa ação pode levar alguns instantes.*
+
+A mensagem **chegou**, mas o celular do destinatário não conseguiu
+descriptografar. Quando isso acontece ele pede o reenvio — e o Baileys só
+atende esse pedido se `getMessage` devolver o conteúdo original. É o próprio
+Baileys que diz, no tipo de `getMessage`, que implementar isso *"solves the
+'this message can take a while' issue"*.
+
+O servidor guarda as últimas 300 mensagens enviadas em memória só para isso.
+Como é em memória, reiniciar o processo perde essa lembrança: as mensagens em
+trânsito naquele momento podem ficar ilegíveis para sempre. Evite reiniciar
+logo depois de um disparo.
+
+Também vale esperar a conexão assentar: o servidor aguarda 15s depois de
+conectar antes do primeiro envio (`ASSENTAR`), porque o Baileys ainda está
+subindo pré-chaves nesse intervalo, e mandar em cima disso produz justamente
+mensagem que não abre.
+
 ## Se o QR Code nunca aparece
 
 O sintoma é o app pedindo o código para sempre enquanto o Termux repete
