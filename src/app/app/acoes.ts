@@ -296,6 +296,40 @@ export async function removerLeads(ids: string[]): Promise<Resposta & { total?: 
 }
 
 /**
+ * Move varios leads de estagio de uma vez.
+ *
+ * Irma da `removerLeads`: a selecao multipla do funil so sabia excluir, o
+ * que deixava "avancar cinco de uma vez" como cinco toques um a um. Vale a
+ * mesma regra da `moverLead` para `ultimo_contato_em`.
+ */
+export async function moverLeads(
+  ids: string[],
+  status: LeadStatus,
+): Promise<Resposta & { total?: number }> {
+  try {
+    if (ids.length === 0) return { ok: true, total: 0 };
+    const { supabase, user } = await exigirUsuario();
+
+    const atualizacao: Record<string, unknown> = { status };
+    if (status === "contatado") atualizacao.ultimo_contato_em = new Date().toISOString();
+
+    const { error, count } = await supabase
+      .from("leads")
+      .update(atualizacao, { count: "exact" })
+      .in("id", ids)
+      .eq("user_id", user.id);
+    if (error) throw error;
+
+    revalidatePath("/app/leads");
+    revalidatePath("/app");
+    revalidatePath("/app/enviar-mensagem");
+    return { ok: true, total: count ?? 0 };
+  } catch (e) {
+    return falha(e);
+  }
+}
+
+/**
  * Registra que o contato pediu para nao receber mais mensagens.
  *
  * O caminho comum e este: a pessoa responde "me tira dai" no WhatsApp e quem

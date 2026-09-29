@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   atualizarLead,
   matricularEmCadencia,
   bloquearContato,
   marcarContatadoFila,
   moverLead,
+  moverLeads,
   registrarInteracao,
   removerLead,
   removerLeads,
@@ -19,6 +20,7 @@ import { STATUS_DO_ESTAGIO, STATUS_LEAD } from "@/lib/status-lead";
 import {
   LEAD_STATUS_LABEL,
   LEAD_STATUS_ORDEM,
+  PRIORIDADE_CURTA,
   type Cadencia,
   type LeadStatus,
   type PrioridadeRadar,
@@ -41,11 +43,29 @@ export type LeadCartao = {
     nota: number | null;
     totalAvaliacoes: number;
     prioridade: PrioridadeRadar;
+    /** Pontuacao do Radar: quanto maior, mais a empresa precisa do servico. */
+    scoreRadar: number;
     /** Marca a hora em que o wa.me foi aberto pela fila. */
     contatadoFilaEm: string | null;
     whatsappE164: string | null;
   } | null;
 };
+
+type Ordem = "radar" | "contato" | "nome";
+
+const ROTULO_ORDEM: Record<Ordem, string> = {
+  radar: "Radar: quem mais precisa",
+  contato: "Contato mais recente",
+  nome: "Nome (A–Z)",
+};
+
+/**
+ * Sem acento e sem caixa, para a busca achar "vidracaria" quando a empresa
+ * esta cadastrada como "Vidraçaria".
+ */
+function achatar(texto: string): string {
+  return texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
 
 export function FunilLeads({
   leadsIniciais,
@@ -65,6 +85,10 @@ export function FunilLeads({
    * noticia do produto ficava a milhares de pixels. Agora e um toque.
    */
   const [estagio, setEstagio] = useState<LeadStatus>("novo");
+  const [busca, setBusca] = useState("");
+  const [ordem, setOrdem] = useState<Ordem>("radar");
+  const [prioridade, setPrioridade] = useState<PrioridadeRadar | "todas">("todas");
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [detalhe, setDetalhe] = useState<LeadCartao | null>(null);
   const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(new Set());
   const [confirmando, setConfirmando] = useState(false);
@@ -73,6 +97,45 @@ export function FunilLeads({
   const [erro, setErro] = useState<string | null>(null);
   const [desfazer, setDesfazer] = useState<{ leadId: string; de: LeadStatus } | null>(null);
   const [pendente, iniciar] = useTransition();
+
+  /**
+   * A lista depois da busca e do filtro, ja ordenada — mas ANTES do recorte
+   * por estagio, porque as contagens das abas saem daqui. Se elas nao
+   * respeitassem a busca, a aba diria "Novo 40" e a lista mostraria 2.
+   */
+  const filtrados = useMemo(() => {
+    const termo = achatar(busca.trim());
+    const encontrados = leads.filter((lead) => {
+      if (prioridade !== "todas" && lead.empresa?.prioridade !== prioridade) return false;
+      if (!termo) return true;
+      const e = lead.empresa;
+      if (!e) return false;
+      return [e.nome, e.endereco, e.telefone, e.website, e.instagram]
+        .filter((c): c is string => Boolean(c))
+        .some((campo) => achatar(campo).includes(termo));
+    });
+
+    const ordenados = [...encontrados];
+    if (ordem === "radar") {
+      ordenados.sort((a, b) => (b.empresa?.scoreRadar ?? 0) - (a.empresa?.scoreRadar ?? 0));
+    } else if (ordem === "nome") {
+      ordenados.sort((a, b) =>
+        (a.empresa?.nome ?? "").localeCompare(b.empresa?.nome ?? "", "pt-BR"),
+      );
+    } else {
+      // Sem contato registrado vai para o fim: e o que voce ainda nao tocou,
+      // nao o mais antigo.
+      ordenados.sort((a, b) => {
+        if (!a.ultimoContatoEm) return b.ultimoContatoEm ? 1 : 0;
+        if (!b.ultimoContatoEm) return -1;
+        return b.ultimoContatoEm.localeCompare(a.ultimoContatoEm);
+      });
+    }
+    return ordenados;
+  }, [leads, busca, prioridade, ordem]);
+
+  const filtrosAtivos =
+    (busca.trim() ? 1 : 0) + (prioridade !== "todas" ? 1 : 0) + (ordem !== "radar" ? 1 : 0);
 
   function alternar(leadId: string) {
     setConfirmando(false);
@@ -123,6 +186,37 @@ export function FunilLeads({
   }
 
   /**
+   * Move todos os selecionados de uma vez.
+   *
+   * A selecao multipla so sabia excluir: avancar cinco leads era cinco idas
+   * ao cartao, um por um. Mesma regra da `mover`: falha reverte e aparece.
+   */
+  function moverSelecionados(status: LeadStatus) {
+    const ids = [...selecionados];
+    const antes = leads;
+
+    setLeads((atual) =>
+      atual.map((lead) => (selecionados.has(lead.id) ? { ...lead, status } : lead)),
+    );
+    setSelecionados(new Set());
+    setConfirmando(false);
+    setAviso(null);
+    setErro(null);
+    setDesfazer(null);
+
+    iniciar(async () => {
+      const r = await moverLeads(ids, status);
+      if (!r.ok) {
+        setLeads(antes);
+        setErro(r.erro ?? "Não consegui mover.");
+        return;
+      }
+      const total = r.total ?? ids.length;
+      setAviso(`${total} lead${total === 1 ? "" : "s"} em ${LEAD_STATUS_LABEL[status].toLowerCase()}.`);
+    });
+  }
+
+  /**
    * Move um lead de estagio.
    *
    * O retorno era descartado: a rede caia, o cartao mudava de lugar na tela,
@@ -152,60 +246,6 @@ export function FunilLeads({
 
   return (
     <>
-      {/*
-        A barra fica em top-16, nao top-2: o cabecalho do app e sticky com
-        56px, e ela se escondia atras dele durante a rolagem — voce
-        confirmava uma exclusao que nao estava vendo.
-      */}
-      {selecionados.size > 0 && (
-        <div className="sticky top-16 z-30 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-lg sm:top-4">
-          <span className="text-sm font-semibold text-slate-900">
-            {selecionados.size === 1
-              ? "1 lead selecionado"
-              : `${selecionados.size} leads selecionados`}
-          </span>
-
-          <div className="ml-auto flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSelecionados(new Set());
-                setConfirmando(false);
-              }}
-              className="botao-secundario !px-3 !py-1.5 !text-sm"
-            >
-              Limpar seleção
-            </button>
-
-            {/* Dois toques de propósito: excluir aqui não tem desfazer. */}
-            {confirmando ? (
-              <button
-                type="button"
-                onClick={excluirSelecionados}
-                className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-700"
-              >
-                Confirmar exclusão de {selecionados.size}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmando(true)}
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-rose-700 ring-1 ring-rose-300 transition hover:bg-rose-50"
-              >
-                Excluir selecionados
-              </button>
-            )}
-          </div>
-
-          {confirmando && (
-            <p className="w-full text-xs leading-relaxed text-slate-600">
-              Sai só do funil. A empresa continua nos resultados e no radar, então dá para
-              trazer de volta depois.
-            </p>
-          )}
-        </div>
-      )}
-
       {erro && (
         <p
           className="mb-3 rounded-lg bg-rose-50 px-3.5 py-2.5 text-sm text-rose-800 ring-1 ring-rose-200"
@@ -252,7 +292,81 @@ export function FunilLeads({
         e um filtro, o cartao ganha a largura toda, e avancar vira um alvo
         de 44px — o gesto que a tela existe para servir.
       */}
+      {/*
+        Um sticky so, empilhado.
+
+        A barra de selecao e as abas eram dois blocos sticky no MESMO top-16,
+        e o de cima simplesmente cobria o de baixo: com algo selecionado voce
+        perdia de vista em que estagio estava, inclusive depois de mover.
+        Juntas, elas empilham.
+      */}
       <div className="sticky top-16 z-20 -mx-4 mb-3 bg-slate-50/95 px-4 py-2 backdrop-blur sm:top-4 sm:mx-0 sm:rounded-xl sm:px-2">
+        {selecionados.size > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-sm">
+            <span className="text-sm font-semibold text-slate-900">
+              {selecionados.size === 1
+                ? "1 lead selecionado"
+                : `${selecionados.size} leads selecionados`}
+            </span>
+
+            <div className="ml-auto flex flex-wrap gap-2">
+              <select
+                aria-label="Mover os selecionados para outro estágio"
+                value=""
+                disabled={pendente}
+                onChange={(e) => {
+                  if (e.target.value) moverSelecionados(e.target.value as LeadStatus);
+                }}
+                className="min-h-11 rounded-lg bg-slate-100 px-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-60"
+              >
+                <option value="">Mover para…</option>
+                {LEAD_STATUS_ORDEM.map((st) => (
+                  <option key={st} value={st}>
+                    {LEAD_STATUS_LABEL[st]}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelecionados(new Set());
+                  setConfirmando(false);
+                }}
+                className="botao-secundario min-h-11 !px-3 !text-sm"
+              >
+                Limpar seleção
+              </button>
+
+              {/* Dois toques de propósito: excluir aqui não tem desfazer. */}
+              {confirmando ? (
+                <button
+                  type="button"
+                  onClick={excluirSelecionados}
+                  className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+                >
+                  Confirmar exclusão de {selecionados.size}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmando(true)}
+                  className="rounded-lg px-3 py-1.5 text-sm font-semibold text-rose-700 ring-1 ring-rose-300 transition hover:bg-rose-50"
+                >
+                  Excluir selecionados
+                </button>
+              )}
+            </div>
+
+            {confirmando && (
+              <p className="w-full text-xs leading-relaxed text-slate-600">
+                Sai só do funil. A empresa continua nos resultados e no radar, então dá para
+                trazer de volta depois.
+              </p>
+            )}
+          </div>
+        )}
+
         <div
           role="tablist"
           aria-label="Estágio do funil"
@@ -263,7 +377,7 @@ export function FunilLeads({
           className="grid grid-cols-2 gap-1 sm:grid-cols-4"
         >
           {LEAD_STATUS_ORDEM.map((s) => {
-            const quantos = leads.filter((lead) => lead.status === s).length;
+            const quantos = filtrados.filter((lead) => lead.status === s).length;
             const ativo = s === estagio;
             return (
               <button
@@ -289,19 +403,141 @@ export function FunilLeads({
             );
           })}
         </div>
+
+        {/*
+          Some durante a selecao. Filtrar com leads marcados deixava a
+          selecao viva em linhas que sairam da tela, e "Excluir selecionados"
+          apagava o que ninguem estava vendo.
+        */}
+        {selecionados.size === 0 && (
+          <>
+            <div className="mt-2 flex gap-1.5">
+              <div className="relative flex-1">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input
+                  type="search"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar empresa…"
+                  aria-label="Buscar no funil"
+                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-11 text-sm text-slate-900 placeholder:text-slate-500"
+                />
+                {busca && (
+                  <button
+                    type="button"
+                    onClick={() => setBusca("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-0.5 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFiltrosAbertos((a) => !a)}
+                aria-expanded={filtrosAbertos}
+                className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition ${
+                  filtrosAtivos > 0
+                    ? "bg-marca-50 text-marca-700 ring-1 ring-marca-200"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                Ordenar
+                {filtrosAtivos > 0 && (
+                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-marca-600 px-1 text-[11px] text-[#ffffff]">
+                    {filtrosAtivos}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {filtrosAbertos && (
+              <div className="anim-entrada mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-slate-600">
+                  Ordenar por
+                  <select
+                    value={ordem}
+                    onChange={(e) => setOrdem(e.target.value as Ordem)}
+                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-900"
+                  >
+                    {(Object.keys(ROTULO_ORDEM) as Ordem[]).map((o) => (
+                      <option key={o} value={o}>
+                        {ROTULO_ORDEM[o]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Prioridade do Radar
+                  <select
+                    value={prioridade}
+                    onChange={(e) => setPrioridade(e.target.value as PrioridadeRadar | "todas")}
+                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-900"
+                  >
+                    <option value="todas">Todas</option>
+                    {(["alta", "media_alta", "media", "baixa"] as PrioridadeRadar[]).map((pr) => (
+                      <option key={pr} value={pr}>
+                        {PRIORIDADE_CURTA[pr]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {(() => {
-        const doEstagio = leads.filter((lead) => lead.status === estagio);
+        const doEstagio = filtrados.filter((lead) => lead.status === estagio);
         const todosMarcados =
           doEstagio.length > 0 && doEstagio.every((lead) => selecionados.has(lead.id));
         const proximo = LEAD_STATUS_ORDEM[LEAD_STATUS_ORDEM.indexOf(estagio) + 1] ?? null;
 
         if (doEstagio.length === 0) {
+          // Vazio por filtro e vazio de verdade sao coisas diferentes, e
+          // dizer so "nenhum lead" na primeira manda procurar um problema
+          // que nao existe. Havendo resultado em outro estagio, a saida e
+          // trocar de aba, nao limpar a busca.
+          const emOutros = filtrados.length;
           return (
-            <p className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
-              Nenhum lead em {LEAD_STATUS_LABEL[estagio].toLowerCase()}.
-            </p>
+            <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center">
+              <p className="text-sm text-slate-600">
+                {filtrosAtivos === 0
+                  ? `Nenhum lead em ${LEAD_STATUS_LABEL[estagio].toLowerCase()}.`
+                  : emOutros > 0
+                    ? `Nenhum resultado em ${LEAD_STATUS_LABEL[estagio]}. ${emOutros === 1 ? "1 lead em outro estágio bate" : `${emOutros} leads em outros estágios batem`} com o filtro.`
+                    : `Nada encontrado${busca.trim() ? ` para “${busca.trim()}”` : ""}.`}
+              </p>
+              {filtrosAtivos > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBusca("");
+                    setPrioridade("todas");
+                    setOrdem("radar");
+                  }}
+                  className="mt-3 min-h-11 rounded-lg px-3 text-sm font-semibold text-marca-700 hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </div>
           );
         }
 
@@ -309,8 +545,8 @@ export function FunilLeads({
           <>
             <div className="mb-2 flex items-center justify-between px-1">
               <p className="text-xs text-slate-500">
-                {doEstagio.length} {doEstagio.length === 1 ? "lead" : "leads"}, do maior score do
-                Radar para o menor
+                {doEstagio.length} {doEstagio.length === 1 ? "lead" : "leads"} ·{" "}
+                {ROTULO_ORDEM[ordem].toLowerCase()}
               </p>
               <button
                 type="button"

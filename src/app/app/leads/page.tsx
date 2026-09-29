@@ -43,10 +43,12 @@ export default async function PaginaLeads({
     .select(
       "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade, score_radar, contatado_fila_em, whatsapp_e164 )",
     )
-    // Por score do Radar. O posicionamento do produto e ordenar por
-    // necessidade — quem tem menos presenca digital primeiro — e o funil
-    // descartava isso, ordenando por posicao e data de entrada.
-    .order("score_radar", { ascending: false, referencedTable: "empresas" })
+    // Ordem estavel de desempate. A ordenacao que importa — por score do
+    // Radar, que e o posicionamento do produto — acontece no componente,
+    // NAO aqui: `.order("score_radar", { referencedTable: "empresas" })`
+    // parece resolver mas nao resolve. No PostgREST isso ordena as linhas
+    // EMBUTIDAS, e como cada lead tem uma empresa so, ordenar um conjunto
+    // de um elemento nao muda nada. A lista vinha por data de entrada.
     .order("criado_em", { ascending: false });
 
   if (projeto) consulta = consulta.eq("projeto_id", projeto);
@@ -78,6 +80,7 @@ export default async function PaginaLeads({
             whatsappE164: empresa.whatsapp_e164 ?? null,
             totalAvaliacoes: empresa.total_avaliacoes,
             prioridade: empresa.prioridade,
+            scoreRadar: empresa.score_radar ?? 0,
           }
         : null,
     };
