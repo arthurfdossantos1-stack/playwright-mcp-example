@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { cancelarFollowUp, marcarFollowUpEnviado } from "@/app/app/acoes";
-import { formatarDataHora, linkWhatsApp } from "@/lib/format";
+import { formatarDataHora } from "@/lib/format";
+import { linkWhatsappEmpresa } from "@/lib/whatsapp";
 import { CANAL_LABEL, type CanalContato } from "@/lib/types";
 
 export type FollowUpItem = {
@@ -12,6 +13,7 @@ export type FollowUpItem = {
   mensagem: string | null;
   empresa: string;
   telefone: string | null;
+  whatsappE164: string | null;
 };
 
 export function PainelFollowUps({ followUps }: { followUps: FollowUpItem[] }) {
@@ -64,7 +66,10 @@ export function PainelFollowUps({ followUps }: { followUps: FollowUpItem[] }) {
   return (
     <ul className="space-y-2.5">
       {lista.map((item) => {
-        const whatsapp = linkWhatsApp(item.telefone, item.mensagem ?? "");
+        const whatsapp = linkWhatsappEmpresa(
+          { whatsapp_e164: item.whatsappE164, telefone: item.telefone },
+          item.mensagem ?? "",
+        );
         const expandido = aberto === item.id;
 
         return (

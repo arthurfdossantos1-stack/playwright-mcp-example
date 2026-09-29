@@ -24,6 +24,7 @@ type LinhaLead = {
     nota: number | null;
     total_avaliacoes: number;
     prioridade: PrioridadeRadar;
+    score_radar: number | null;
     contatado_fila_em: string | null;
     whatsapp_e164: string | null;
   } | null;
@@ -40,9 +41,12 @@ export default async function PaginaLeads({
   let consulta = supabase
     .from("leads")
     .select(
-      "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade, contatado_fila_em, whatsapp_e164 )",
+      "id, status, projeto_id, observacoes, ultimo_contato_em, empresas ( id, nome, endereco, telefone, website, instagram, nota, total_avaliacoes, prioridade, score_radar, contatado_fila_em, whatsapp_e164 )",
     )
-    .order("posicao", { ascending: true })
+    // Por score do Radar. O posicionamento do produto e ordenar por
+    // necessidade — quem tem menos presenca digital primeiro — e o funil
+    // descartava isso, ordenando por posicao e data de entrada.
+    .order("score_radar", { ascending: false, referencedTable: "empresas" })
     .order("criado_em", { ascending: false });
 
   if (projeto) consulta = consulta.eq("projeto_id", projeto);
@@ -111,7 +115,7 @@ export default async function PaginaLeads({
     <>
       <CabecalhoPagina
         titulo="Funil de leads"
-        descricao="Arraste os cartões entre as colunas ou use os atalhos. Clique no cartão para abrir detalhes, iniciar uma cadência e anotar o que foi conversado."
+        descricao="Escolha o estágio acima da lista. Toque no nome da empresa para ver detalhes, iniciar uma cadência e anotar o que foi conversado."
         acao={
           <Link href="/app/radar" className="botao-secundario !px-3.5 !py-2 !text-sm">
             Buscar no Radar

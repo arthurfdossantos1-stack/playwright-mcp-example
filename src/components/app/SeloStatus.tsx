@@ -24,7 +24,7 @@ export function SeloStatus({
   return (
     <span
       title={descricao.rotulo}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ring-1 ${descricao.classe} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${descricao.classe} ${className}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${descricao.ponto}`} />
       {curto ? descricao.curto : descricao.rotulo}

@@ -17,7 +17,10 @@ type FollowUpPainel = {
   status: string;
   canal: string;
   mensagem: string | null;
-  leads: { id: string; empresas: { nome: string; telefone: string | null } | null } | null;
+  leads: {
+    id: string;
+    empresas: { nome: string; telefone: string | null; whatsapp_e164: string | null } | null;
+  } | null;
 };
 
 export default async function PaginaVisaoGeral() {
@@ -40,7 +43,9 @@ export default async function PaginaVisaoGeral() {
     supabase.from("leads").select("id, status, empresas ( contatado_fila_em )"),
     supabase
       .from("follow_ups")
-      .select("id, agendado_para, status, canal, mensagem, leads ( id, empresas ( nome, telefone ) )")
+      .select(
+        "id, agendado_para, status, canal, mensagem, leads ( id, empresas ( nome, telefone, whatsapp_e164 ) )",
+      )
       .in("status", ["pendente", "pronto"])
       .lte("agendado_para", agora)
       .order("agendado_para", { ascending: true })
@@ -136,6 +141,7 @@ export default async function PaginaVisaoGeral() {
               mensagem: f.mensagem,
               empresa: f.leads?.empresas?.nome ?? "Lead",
               telefone: f.leads?.empresas?.telefone ?? null,
+              whatsappE164: f.leads?.empresas?.whatsapp_e164 ?? null,
             }))}
           />
         </section>

@@ -12,7 +12,8 @@ import {
 } from "@/app/app/acoes";
 import { SeloPrioridade } from "./SeloPrioridade";
 import { SeloStatus } from "./SeloStatus";
-import { limparUrl, linkWhatsApp, tempoRelativo } from "@/lib/format";
+import { limparUrl, tempoRelativo } from "@/lib/format";
+import { linkWhatsappEmpresa } from "@/lib/whatsapp";
 import {
   LEAD_STATUS_LABEL,
   LEAD_STATUS_ORDEM,
@@ -61,13 +62,22 @@ export function FunilLeads({
   cadencias: Cadencia[];
 }) {
   const [leads, setLeads] = useState(leadsIniciais);
-  const [arrastando, setArrastando] = useState<string | null>(null);
-  const [colunaAlvo, setColunaAlvo] = useState<LeadStatus | null>(null);
+  /**
+   * Qual estagio esta na tela.
+   *
+   * Antes eram quatro colunas empilhadas: no celular, ver quem RESPONDEU
+   * exigia rolar por todos os "novo" e todos os "contatado" — a melhor
+   * noticia do produto ficava a milhares de pixels. Agora e um toque.
+   */
+  const [estagio, setEstagio] = useState<LeadStatus>("novo");
   const [detalhe, setDetalhe] = useState<LeadCartao | null>(null);
   const [selecionados, setSelecionados] = useState<ReadonlySet<string>>(new Set());
   const [confirmando, setConfirmando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [, iniciar] = useTransition();
+  /** Erro separado do aviso: sucesso e falha rendiam identicos, em cinza. */
+  const [erro, setErro] = useState<string | null>(null);
+  const [desfazer, setDesfazer] = useState<{ leadId: string; de: LeadStatus } | null>(null);
+  const [pendente, iniciar] = useTransition();
 
   function alternar(leadId: string) {
     setConfirmando(false);
@@ -101,12 +111,14 @@ export function FunilLeads({
     setSelecionados(new Set());
     setConfirmando(false);
     setAviso(null);
+    setErro(null);
+    setDesfazer(null);
 
     iniciar(async () => {
       const r = await removerLeads(ids);
       if (!r.ok) {
         setLeads(antes);
-        setAviso(r.erro ?? "Não consegui excluir.");
+        setErro(r.erro ?? "Não consegui excluir.");
         return;
       }
       setAviso(
@@ -115,28 +127,43 @@ export function FunilLeads({
     });
   }
 
+  /**
+   * Move um lead de estagio.
+   *
+   * O retorno era descartado: a rede caia, o cartao mudava de lugar na tela,
+   * o banco nao, e o lead voltava sozinho no proximo carregamento. Agora a
+   * falha reverte e aparece, e o acerto vem com desfazer — mover era a unica
+   * acao da tela sem volta.
+   */
   function mover(leadId: string, status: LeadStatus) {
-    setLeads((atual) =>
-      atual.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)),
-    );
-    iniciar(async () => {
-      await moverLead(leadId, status);
-    });
-  }
+    const anterior = leads.find((l) => l.id === leadId)?.status;
+    setLeads((atual) => atual.map((lead) => (lead.id === leadId ? { ...lead, status } : lead)));
+    setAviso(null);
 
-  function aoSoltar(status: LeadStatus) {
-    if (arrastando) {
-      const lead = leads.find((l) => l.id === arrastando);
-      if (lead && lead.status !== status) mover(arrastando, status);
-    }
-    setArrastando(null);
-    setColunaAlvo(null);
+    iniciar(async () => {
+      const r = await moverLead(leadId, status);
+      if (!r.ok) {
+        if (anterior) {
+          setLeads((atual) =>
+            atual.map((lead) => (lead.id === leadId ? { ...lead, status: anterior } : lead)),
+          );
+        }
+        setErro(r.erro ?? "Não consegui mover o lead.");
+        return;
+      }
+      if (anterior && anterior !== status) setDesfazer({ leadId, de: anterior });
+    });
   }
 
   return (
     <>
+      {/*
+        A barra fica em top-16, nao top-2: o cabecalho do app e sticky com
+        56px, e ela se escondia atras dele durante a rolagem — voce
+        confirmava uma exclusao que nao estava vendo.
+      */}
       {selecionados.size > 0 && (
-        <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-lg">
+        <div className="sticky top-16 z-30 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-lg sm:top-4">
           <span className="text-sm font-semibold text-slate-900">
             {selecionados.size === 1
               ? "1 lead selecionado"
@@ -184,97 +211,151 @@ export function FunilLeads({
         </div>
       )}
 
+      {erro && (
+        <p
+          className="mb-3 rounded-lg bg-rose-50 px-3.5 py-2.5 text-sm text-rose-800 ring-1 ring-rose-200"
+          role="alert"
+        >
+          {erro}
+        </p>
+      )}
+
+      {desfazer && (
+        <div
+          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2.5 text-sm text-[#ffffff]"
+          role="status"
+        >
+          <span>Lead movido.</span>
+          <button
+            type="button"
+            onClick={() => {
+              const { leadId, de } = desfazer;
+              setDesfazer(null);
+              mover(leadId, de);
+            }}
+            className="ml-auto min-h-11 rounded-lg px-3 font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-400"
+          >
+            Desfazer
+          </button>
+        </div>
+      )}
+
       {aviso && (
         <p
-          className="mb-3 rounded-lg bg-slate-100 px-3.5 py-2.5 text-sm text-slate-700"
+          className="mb-3 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-900 ring-1 ring-emerald-200"
           role="status"
         >
           {aviso}
         </p>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-4">
-        {LEAD_STATUS_ORDEM.map((status) => {
-          const daColuna = leads.filter((lead) => lead.status === status);
-          const destacada = colunaAlvo === status;
-          const todosMarcados =
-            daColuna.length > 0 && daColuna.every((lead) => selecionados.has(lead.id));
+      {/*
+        Filtro de estagio no lugar das quatro colunas empilhadas.
 
+        O kanban supunha tela larga e mouse: no toque os eventos de arrastar
+        nem disparam, e a alternativa eram pastilhas de 23px. Aqui o estagio
+        e um filtro, o cartao ganha a largura toda, e avancar vira um alvo
+        de 44px — o gesto que a tela existe para servir.
+      */}
+      <div className="sticky top-16 z-20 -mx-4 mb-3 bg-slate-50/95 px-4 py-2 backdrop-blur sm:top-4 sm:mx-0 sm:rounded-xl sm:px-2">
+        <div
+          role="tablist"
+          aria-label="Estágio do funil"
+          className="flex gap-1 overflow-x-auto"
+        >
+          {LEAD_STATUS_ORDEM.map((s) => {
+            const quantos = leads.filter((lead) => lead.status === s).length;
+            const ativo = s === estagio;
+            return (
+              <button
+                key={s}
+                type="button"
+                role="tab"
+                aria-selected={ativo}
+                onClick={() => setEstagio(s)}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-500 ${
+                  ativo
+                    ? "bg-marca-600 text-[#ffffff]"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${ativo ? "bg-[#ffffff]" : CORES_COLUNA[s]}`} />
+                {LEAD_STATUS_LABEL[s]}
+                <span className={ativo ? "opacity-80" : "text-slate-400"}>{quantos}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {(() => {
+        const doEstagio = leads.filter((lead) => lead.status === estagio);
+        const todosMarcados =
+          doEstagio.length > 0 && doEstagio.every((lead) => selecionados.has(lead.id));
+        const proximo = LEAD_STATUS_ORDEM[LEAD_STATUS_ORDEM.indexOf(estagio) + 1] ?? null;
+
+        if (doEstagio.length === 0) {
           return (
-            <section
-              key={status}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setColunaAlvo(status);
-              }}
-              onDragLeave={() => setColunaAlvo((atual) => (atual === status ? null : atual))}
-              onDrop={() => aoSoltar(status)}
-              className={`rounded-2xl border p-3 transition ${
-                destacada ? "border-marca-400 bg-marca-50" : "border-slate-200 bg-slate-100/70"
-              }`}
-            >
-              <header className="mb-3 flex items-center gap-2 px-1">
-                <span className={`h-2 w-2 rounded-full ${CORES_COLUNA[status]}`} />
-                <h2 className="text-sm font-bold text-slate-700">{LEAD_STATUS_LABEL[status]}</h2>
-                {daColuna.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => alternarColuna(daColuna, todosMarcados)}
-                    className="ml-auto rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700"
-                  >
-                    {todosMarcados ? "Desmarcar" : "Marcar todos"}
-                  </button>
-                )}
-                <span
-                  className={`rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 ${
-                    daColuna.length === 0 ? "ml-auto" : ""
+            <p className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
+              Nenhum lead em {LEAD_STATUS_LABEL[estagio].toLowerCase()}.
+            </p>
+          );
+        }
+
+        return (
+          <>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-xs text-slate-500">
+                {doEstagio.length} {doEstagio.length === 1 ? "lead" : "leads"}, do maior score do
+                Radar para o menor
+              </p>
+              <button
+                type="button"
+                onClick={() => alternarColuna(doEstagio, todosMarcados)}
+                className="min-h-11 rounded-lg px-2 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-500"
+              >
+                {todosMarcados ? "Desmarcar todos" : "Marcar todos"}
+              </button>
+            </div>
+
+            <ul className="space-y-2.5">
+              {doEstagio.map((lead) => (
+                <li
+                  key={lead.id}
+                  className={`rounded-xl border bg-white shadow-sm transition ${
+                    selecionados.has(lead.id)
+                      ? "border-marca-400 ring-2 ring-marca-200"
+                      : "border-slate-200"
                   }`}
                 >
-                  {daColuna.length}
-                </span>
-              </header>
-
-              <ul className="space-y-2.5">
-                {daColuna.map((lead) => (
-                  <li
-                    key={lead.id}
-                    draggable
-                    onDragStart={() => setArrastando(lead.id)}
-                    onDragEnd={() => {
-                      setArrastando(null);
-                      setColunaAlvo(null);
-                    }}
-                    className={`cursor-grab rounded-xl border bg-white p-3 shadow-sm transition active:cursor-grabbing ${
-                      selecionados.has(lead.id)
-                        ? "border-marca-400 ring-2 ring-marca-200"
-                        : "border-slate-200"
-                    } ${arrastando === lead.id ? "opacity-50" : "hover:shadow-md"}`}
-                  >
-                    <div className="flex items-start gap-2">
+                  <div className="flex items-start">
+                    {/* Alvo de 44px: o quadrado continua com 16px, a area de
+                        toque e que cresce. Uma mao, andando, erra menos. */}
+                    <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center p-3">
                       <input
                         type="checkbox"
                         checked={selecionados.has(lead.id)}
                         onChange={() => alternar(lead.id)}
                         aria-label={`Selecionar ${lead.empresa?.nome ?? "lead"}`}
-                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-marca-500"
+                        className="h-4 w-4 cursor-pointer accent-marca-500"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setDetalhe(lead)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                      <p className="text-sm font-semibold leading-snug text-slate-900">
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => setDetalhe(lead)}
+                      className="min-w-0 flex-1 py-3 pr-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-500"
+                    >
+                      <span className="block text-sm font-semibold leading-snug text-slate-900">
                         {lead.empresa?.nome ?? "Empresa removida"}
-                      </p>
+                      </span>
                       {lead.empresa && (
-                        <p className="mt-1 truncate text-xs text-slate-500">
-                          {lead.empresa.website
-                            ? limparUrl(lead.empresa.website)
-                            : "Sem site"}
+                        <span className="mt-1 block truncate text-xs text-slate-500">
+                          {lead.empresa.website ? limparUrl(lead.empresa.website) : "Sem site"}
                           {lead.empresa.telefone ? ` · ${lead.empresa.telefone}` : ""}
-                        </p>
+                        </span>
                       )}
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="mt-2 flex flex-wrap items-center gap-1.5">
                         <SeloStatus
                           sinais={{
                             lead_id: lead.id,
@@ -285,40 +366,52 @@ export function FunilLeads({
                         />
                         {lead.empresa && <SeloPrioridade prioridade={lead.empresa.prioridade} />}
                         {lead.ultimoContatoEm && (
-                          <span className="text-[11px] text-slate-400">
-                            {tempoRelativo(lead.ultimoContatoEm)}
+                          <span className="text-[11px] text-slate-500">
+                            contato {tempoRelativo(lead.ultimoContatoEm)}
                           </span>
                         )}
-                      </div>
+                      </span>
                     </button>
-                    </div>
+                  </div>
 
-                    <div className="mt-2.5 flex gap-1.5 border-t border-slate-100 pt-2.5">
+                  <div className="flex gap-1.5 border-t border-slate-100 p-2">
+                    {proximo ? (
+                      <button
+                        type="button"
+                        onClick={() => mover(lead.id, proximo)}
+                        disabled={pendente}
+                        className="botao-primario min-h-11 flex-1 !py-2 !text-sm"
+                      >
+                        Avançar para {LEAD_STATUS_LABEL[proximo]}
+                      </button>
+                    ) : (
+                      <span className="flex min-h-11 flex-1 items-center justify-center text-sm font-semibold text-emerald-700">
+                        Fechado
+                      </span>
+                    )}
+                    <select
+                      aria-label={`Mover ${lead.empresa?.nome ?? "lead"} para outro estágio`}
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) mover(lead.id, e.target.value as LeadStatus);
+                      }}
+                      className="min-h-11 rounded-lg bg-slate-100 px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-500"
+                    >
+                      <option value="">Mover…</option>
                       {LEAD_STATUS_ORDEM.filter((s) => s !== lead.status).map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => mover(lead.id, s)}
-                          className="rounded-md bg-slate-100 px-1.5 py-1 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-200"
-                          title={`Mover para ${LEAD_STATUS_LABEL[s]}`}
-                        >
+                        <option key={s} value={s}>
                           {LEAD_STATUS_LABEL[s]}
-                        </button>
+                        </option>
                       ))}
-                    </div>
-                  </li>
-                ))}
+                    </select>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        );
+      })()}
 
-                {daColuna.length === 0 && (
-                  <li className="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-400">
-                    Arraste um lead para cá
-                  </li>
-                )}
-              </ul>
-            </section>
-          );
-        })}
-      </div>
 
       {detalhe && (
         <DetalheLead
@@ -361,7 +454,12 @@ function DetalheLead({
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
 
-  const whatsapp = linkWhatsApp(lead.empresa?.telefone);
+  const whatsapp = lead.empresa
+    ? linkWhatsappEmpresa({
+        whatsapp_e164: lead.empresa.whatsappE164,
+        telefone: lead.empresa.telefone,
+      })
+    : null;
 
   function salvar() {
     setMensagem(null);

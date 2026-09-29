@@ -50,14 +50,11 @@ export function apenasDigitos(valor: string | null | undefined): string {
   return (valor ?? "").replace(/\D/g, "");
 }
 
-/** Link de WhatsApp com mensagem pre-preenchida. */
-export function linkWhatsApp(telefone: string | null | undefined, mensagem = ""): string | null {
-  const digitos = apenasDigitos(telefone);
-  if (digitos.length < 8) return null;
-  const comDdi = digitos.startsWith("55") ? digitos : `55${digitos}`;
-  const texto = mensagem ? `?text=${encodeURIComponent(mensagem)}` : "";
-  return `https://wa.me/${comDdi}${texto}`;
-}
+// linkWhatsApp foi removida: ela prefixava "55" em todo numero sem DDI, o que
+// transformava um lead de Portugal, Espanha, Argentina, Mexico ou Estados
+// Unidos numa conversa com um brasileiro aleatorio. Use
+// linkWhatsappEmpresa de @/lib/whatsapp, que parte do E.164 ja normalizado na
+// varredura e prefere nao oferecer o botao a mandar para o numero errado.
 
 export function iniciais(nome: string | null | undefined): string {
   if (!nome) return "RL";
