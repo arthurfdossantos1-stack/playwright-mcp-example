@@ -15,6 +15,7 @@ import { SeloPrioridade } from "./SeloPrioridade";
 import { SeloStatus } from "./SeloStatus";
 import { limparUrl, tempoRelativo } from "@/lib/format";
 import { linkWhatsappEmpresa } from "@/lib/whatsapp";
+import { STATUS_DO_ESTAGIO, STATUS_LEAD } from "@/lib/status-lead";
 import {
   LEAD_STATUS_LABEL,
   LEAD_STATUS_ORDEM,
@@ -44,13 +45,6 @@ export type LeadCartao = {
     contatadoFilaEm: string | null;
     whatsappE164: string | null;
   } | null;
-};
-
-const CORES_COLUNA: Record<LeadStatus, string> = {
-  novo: "bg-slate-400",
-  contatado: "bg-marca-500",
-  respondeu: "bg-amber-400",
-  fechado: "bg-acento-500",
 };
 
 export function FunilLeads({
@@ -262,7 +256,11 @@ export function FunilLeads({
         <div
           role="tablist"
           aria-label="Estágio do funil"
-          className="flex gap-1 overflow-x-auto"
+          /* Grade, nao rolagem horizontal: em 390px as quatro abas em uma
+             linha davam 457px de conteudo em 342px de espaco, e "Fechado"
+             sobrava 19px visiveis atras de um scroll sem nenhuma pista na
+             tela. Duas por linha cabem inteiras sem rolar nada. */
+          className="grid grid-cols-2 gap-1 sm:grid-cols-4"
         >
           {LEAD_STATUS_ORDEM.map((s) => {
             const quantos = leads.filter((lead) => lead.status === s).length;
@@ -274,15 +272,19 @@ export function FunilLeads({
                 role="tab"
                 aria-selected={ativo}
                 onClick={() => setEstagio(s)}
-                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-500 ${
+                className={`flex min-h-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition ${
                   ativo
                     ? "bg-marca-600 text-[#ffffff]"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
                 }`}
               >
-                <span className={`h-2 w-2 rounded-full ${ativo ? "bg-[#ffffff]" : CORES_COLUNA[s]}`} />
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    ativo ? "bg-[#ffffff]" : STATUS_LEAD[STATUS_DO_ESTAGIO[s]].ponto
+                  }`}
+                />
                 {LEAD_STATUS_LABEL[s]}
-                <span className={ativo ? "opacity-80" : "text-slate-400"}>{quantos}</span>
+                <span className={ativo ? "opacity-80" : "text-slate-500"}>{quantos}</span>
               </button>
             );
           })}
@@ -554,7 +556,7 @@ function DetalheLead({
           <button
             type="button"
             onClick={aoFechar}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100"
             aria-label="Fechar"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">

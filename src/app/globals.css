@@ -64,6 +64,7 @@
     --color-sky-700: #7dd3fc;
   --cor-fundo-pagina: #0b0f16;
   --cor-sombra-cartao: rgb(0 0 0 / 0.55);
+  --cor-foco: #60a5fa;
   color-scheme: dark;
 }
 
@@ -117,6 +118,7 @@
     --color-sky-700: #7dd3fc;
     --cor-fundo-pagina: #0b0f16;
     --cor-sombra-cartao: rgb(0 0 0 / 0.55);
+    --cor-foco: #60a5fa;
     color-scheme: dark;
   }
 }
@@ -168,6 +170,60 @@
 
   ::selection {
     background-color: var(--color-marca-100);
+  }
+
+  /* ---------------------------------------------------------------------
+     Superficies do navegador.
+
+     Foco, cursor de texto, barra de rolagem e numerais chegam do navegador
+     sem cor nenhuma do produto. Tema-los aqui vale para a tela inteira, e
+     e o motivo de nenhum botao novo precisar carregar a propria classe de
+     foco: ate agora nao havia uma regra so, entao quem navegava por teclado
+     via o anel padrao do sistema — ou nada, nos controles que ja mexiam no
+     outline.
+
+     Medido: #2563eb da 5,17:1 sobre branco, e #60a5fa da 6,29:1 sobre o
+     fundo escuro. O minimo para indicador nao textual e 3:1.
+     --------------------------------------------------------------------- */
+  :focus-visible {
+    outline: 2px solid var(--cor-foco, #2563eb);
+    outline-offset: 2px;
+  }
+
+  /* O padrao do navegador ja e o outline acima; isto so evita que o anel
+     duplique nos elementos que o Tailwind marca com ring. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable] {
+    caret-color: var(--cor-foco, #2563eb);
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+  }
+
+  * {
+    scrollbar-color: var(--color-slate-300) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-slate-300);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-400);
+  }
+  ::-webkit-scrollbar-track {
+    background-color: transparent;
   }
 }
 
