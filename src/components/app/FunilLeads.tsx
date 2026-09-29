@@ -5,6 +5,7 @@ import {
   atualizarLead,
   matricularEmCadencia,
   bloquearContato,
+  marcarContatadoFila,
   moverLead,
   registrarInteracao,
   removerLead,
@@ -452,6 +453,8 @@ function DetalheLead({
   const [projetoId, setProjetoId] = useState(lead.projetoId ?? "");
   const [cadenciaId, setCadenciaId] = useState(cadencias[0]?.id ?? "");
   const [mensagem, setMensagem] = useState<string | null>(null);
+  /** Dois toques: bloquear nao tem desfazer pela tela. */
+  const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
   const [pendente, iniciar] = useTransition();
 
   const whatsapp = lead.empresa
@@ -491,8 +494,25 @@ function DetalheLead({
 
   function marcarContato() {
     iniciar(async () => {
-      await registrarInteracao(lead.id, "Contato registrado manualmente", "outro");
-      setMensagem("Contato registrado.");
+      const r = await registrarInteracao(lead.id, "Contato registrado manualmente", "outro");
+      // Antes dizia "Contato registrado." sem conferir nada — ou seja, mentia
+      // quando o banco recusava.
+      setMensagem(r.ok ? "Contato registrado." : (r.erro ?? "Não consegui registrar."));
+    });
+  }
+
+  /**
+   * Abre o WhatsApp e tira o lead da fila automatica.
+   *
+   * Sem a segunda parte, quem voce mensageia na mao continua enfileirado: o
+   * disparo automatico manda de novo depois, e a pessoa recebe duas vezes da
+   * mesma empresa. A tela fabricava o proprio envio duplicado.
+   */
+  function aoAbrirWhatsapp() {
+    const empresaId = lead.empresa?.id;
+    if (!empresaId) return;
+    iniciar(async () => {
+      await marcarContatadoFila(empresaId, lead.id);
     });
   }
 
@@ -546,7 +566,13 @@ function DetalheLead({
         {lead.empresa && (
           <div className="mt-4 flex flex-wrap gap-2">
             {whatsapp && (
-              <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="botao-secundario !px-3 !py-1.5 !text-xs">
+              <a
+                href={whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={aoAbrirWhatsapp}
+                className="botao-secundario !px-3 !py-1.5 !text-xs"
+              >
                 WhatsApp
               </a>
             )}
@@ -648,29 +674,69 @@ function DetalheLead({
           </p>
         )}
 
-        <div className="mt-6 flex items-center justify-between gap-3">
+        {/* Salvar sozinho. Antes ele dividia uma linha justify-between com
+            duas acoes destrutivas, como se os tres fossem pares — e a mais
+            irreversivel das tres caia no centro do rodape de uma folha
+            inferior, que e onde o polegar descansa. */}
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={salvar}
+            disabled={pendente}
+            className="botao-primario min-h-11 w-full !text-sm"
+          >
+            {pendente ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-3 border-t border-slate-200 pt-4">
           <button
             type="button"
             onClick={remover}
             disabled={pendente}
-            className="text-sm font-medium text-rose-600 hover:underline"
+            className="min-h-11 text-sm font-medium text-rose-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
           >
             Remover do funil
           </button>
+
           {lead.empresa?.whatsappE164 && (
-            <button
-              type="button"
-              onClick={naoContatar}
-              disabled={pendente}
-              className="text-sm font-medium text-slate-600 hover:underline"
-              title="Registra a recusa: o número sai de todas as filas e novas buscas não o trazem de volta"
-            >
-              Pediu para não receber
-            </button>
+            <div className="rounded-xl border border-slate-200 p-3.5">
+              <h3 className="text-sm font-bold text-slate-900">Pediu para não receber</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                O número entra na lista de não perturbe: sai de qualquer disparo já
+                enfileirado, some de todas as filas e <strong>nenhuma busca futura o traz de
+                volta</strong>. Vale para a plataforma inteira e não tem como desfazer pela tela.
+              </p>
+              {confirmandoBloqueio ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={naoContatar}
+                    disabled={pendente}
+                    className="min-h-11 rounded-lg bg-rose-600 px-3 text-sm font-semibold text-[#ffffff] transition hover:bg-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+                  >
+                    Confirmar: não contatar mais
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoBloqueio(false)}
+                    className="botao-secundario min-h-11 !text-sm"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoBloqueio(true)}
+                  disabled={pendente}
+                  className="mt-3 min-h-11 rounded-lg px-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-300 transition hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+                >
+                  Registrar recusa
+                </button>
+              )}
+            </div>
           )}
-          <button type="button" onClick={salvar} disabled={pendente} className="botao-primario !px-4 !py-2 !text-sm">
-            {pendente ? "Salvando…" : "Salvar"}
-          </button>
         </div>
       </div>
     </div>
