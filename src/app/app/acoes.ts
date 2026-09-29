@@ -319,12 +319,17 @@ export async function bloquearContato(
       );
     if (error) throw error;
 
+    // O lead sai do funil de vez. Mexer no status nao serviria: o enum
+    // lead_status so tem novo/contatado/respondeu/fechado, e nenhum deles
+    // significa "nao pode ser abordado". Quem guarda a recusa e a tabela
+    // bloqueios, que sobrevive ao lead e a qualquer busca futura.
     if (leadId) {
-      await supabase
+      const { error: erroLead } = await supabase
         .from("leads")
-        .update({ status: "descartado" })
+        .delete()
         .eq("id", leadId)
         .eq("user_id", user.id);
+      if (erroLead) throw erroLead;
     }
 
     revalidatePath("/app/leads");

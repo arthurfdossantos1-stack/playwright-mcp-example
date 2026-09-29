@@ -109,8 +109,17 @@ export async function POST(request: Request) {
   }
 
   // 2. Grava o que o servidor concluiu.
+  //
+  // Se alguma gravacao falhar, a resposta tem que falhar junto. O servidor
+  // ja tirou esses resultados da fila dele ao montar o pedido e so os
+  // devolve quando a resposta nao e OK; respondendo 200 com a gravacao
+  // quebrada, o item continuaria "pendente" no banco, voltaria no proximo
+  // lote e a MESMA pessoa receberia a mensagem de novo. Repetir o lote e
+  // seguro: as gravacoes sao idempotentes.
+  let falhouGravar = false;
+
   for (const r of resultados) {
-    const { data: item } = await supabase
+    const { data: item, error: erroItem } = await supabase
       .from("disparo_itens")
       .update({
         estado: r.estado,
@@ -121,6 +130,11 @@ export async function POST(request: Request) {
       .eq("user_id", userId)
       .select("empresa_id, lead_id")
       .maybeSingle();
+
+    if (erroItem) {
+      falhouGravar = true;
+      continue;
+    }
 
     // "pulado" so acontece por um motivo: o WhatsApp respondeu que o numero
     // nao existe. Sem marcar a empresa, ela continuava elegivel — e como a
@@ -151,6 +165,10 @@ export async function POST(request: Request) {
           .eq("status", "novo");
       }
     }
+  }
+
+  if (falhouGravar) {
+    return NextResponse.json({ erro: "Nao consegui gravar os resultados." }, { status: 503 });
   }
 
   // 3. Disparo ativo. "pausado" entra aqui porque ele e retomavel: quem
